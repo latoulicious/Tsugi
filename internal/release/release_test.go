@@ -47,9 +47,10 @@ func TestTransitionTo(t *testing.T) {
 		{"created to staging", StatusCreated, StatusStaging, nil},
 		{"staging to production", StatusStaging, StatusProduction, nil},
 		{"production to archived", StatusProduction, StatusArchived, nil},
+		{"rollback archived to production", StatusArchived, StatusProduction, nil},
 		{"skip stage", StatusDraft, StatusStaging, ErrInvalidTransition},
 		{"backwards", StatusStaging, StatusCreated, ErrInvalidTransition},
-		{"from terminal", StatusArchived, StatusProduction, ErrInvalidTransition},
+		{"archived skip", StatusArchived, StatusStaging, ErrInvalidTransition},
 		{"unknown target", StatusDraft, Status("bogus"), ErrInvalidStatus},
 	}
 	for _, tc := range tests {

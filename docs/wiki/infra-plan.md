@@ -6,11 +6,12 @@ kept verbatim below for history.
 
 Type: Go release-promotion + deployment-orchestration service + CLI.
 
-Status: **P5 scaffold done** — `deployment` entity + `postgres` pgx adapter +
-`releases`/`deployments` migrations (2026-06-19). P4 `changelog` conventional-
-commit generator (2026-06-19). P3 `release` domain entity + state machine
-(2026-06-19). P2 `GET /version` service (2026-06-19). P1 environment-separation
-scaffold (2026-06-19).
+Status: **P6 scaffold done** — `release` CLI (create/list/show/promote/rollback)
++ `migrate` runner + git/deploy adapters + `WithTx` (2026-06-19). P5 `deployment`
+entity + `postgres` pgx adapter + migrations (2026-06-19). P4 `changelog`
+conventional-commit generator (2026-06-19). P3 `release` domain entity + state
+machine (2026-06-19). P2 `GET /version` service (2026-06-19). P1 environment-
+separation scaffold (2026-06-19).
 
 ## 2026-06-19 Update — Phase 1 scaffold (environment separation)
 
@@ -114,6 +115,32 @@ scaffold (2026-06-19).
 - **Doc drift flagged**: architecture.md earlier said the repository "port lands
   in P5 with the pgx impl" — done as stated. The `release` doc note that there
   was "no repository port yet" is now stale and updated.
+
+## 2026-06-19 Update — Phase 6 scaffold (promotion & rollback)
+
+- The `release` CLI lands: `cmd/tsugi` gains subcommand dispatch — `serve`
+  (unchanged), `migrate up|down`, and `release create|list|show|promote|rollback`.
+  `serve` still starts without a DB; only the CLI paths open a pool.
+- **New flat packages** (peers, not a DDD subtree): `internal/cli` (use-cases),
+  `internal/git` (`os/exec` wrapper — P4's deferred git source), `internal/deploy`
+  (shells `deploy.sh`). `internal/postgres` gains `Connect`, `WithTx` (the
+  deferred tx seam), `UpdateStatus`, and an embedded migration runner.
+- **Semantics**: `create vX` snapshots the validated staging commit + changelog,
+  records the release at `Staging`. `promote vX` runs the real prod deploy at the
+  release commit, then atomically advances `Staging → Production`, archives the
+  prior production release, and marks the deployment succeeded. A failed deploy
+  marks the deployment `failed` and leaves the release at staging. `rollback vX`
+  re-deploys an archived release via the new `Archived → Production` edge.
+- **Deploy-by-SHA**: `deploy.sh` gained `--ref <sha>` (charset-guarded) — a
+  detached checkout instead of `pull --ff-only`, so rollback lands an older
+  commit. The prod←`main` / staging←`dev` invariant holds on the normal path.
+- **Migrations**: applied with `tsugi migrate up` (embedded `*.sql`, tracked in
+  `schema_migrations`); `down` rolls back the last step. Minimal — no dirty-state
+  recovery. The `no golang-migrate lib` decision from P5 holds.
+- **Tests**: rollback edge (`release`), outcome mutators (`deployment`), and full
+  create/promote/rollback orchestration in `internal/cli` via in-memory fakes
+  (no live DB/git/docker). The pgx adapter + runner still need a live Postgres —
+  validated by compile + `go vet`.
 
 Original plan below kept as-is for history.
 

@@ -16,17 +16,19 @@ port for deployment history. Pure domain — stdlib only; the pgx adapter lives 
   the record at `StatusPending`.
 - `Rehydrate(id, releaseID, env, status, deployedAt) (*Deployment, error)` —
   reconstructs a persisted row for DB reads (validates all fields + status).
-- `Repository` (interface) — `Create`, `List`, `ListByEnvironment`. Consumer-
-  defined port; implemented by `internal/postgres`.
+- `MarkSucceeded()` / `MarkFailed()` (P6) — set the outcome; only a `pending`
+  deployment can transition (else `ErrNotPending`).
+- `Repository` (interface) — `Create`, `List`, `ListByEnvironment`,
+  `UpdateStatus` (P6). Consumer-defined port; implemented by `internal/postgres`.
 - Sentinel errors: `ErrInvalidID`, `ErrInvalidReleaseID`,
-  `ErrInvalidEnvironment`, `ErrInvalidStatus`, `ErrNotFound`.
+  `ErrInvalidEnvironment`, `ErrInvalidStatus`, `ErrNotPending`, `ErrNotFound`.
 
 ## Notes
 
 - A deployment references a release by `ReleaseID`, not a branch — the P3/P5
   point. The FK is enforced at the DB (`deployments.release_id`).
-- Outcome transitions (`pending → succeeded`/`failed`) are **not** modelled
-  here; the deploy executor sets the final status in P6. `New` only opens the
-  record at `pending`.
+- Outcome transitions (`pending → succeeded`/`failed`) are guarded mutators
+  (P6); the `internal/cli` deploy path calls them once the deploy returns and
+  persists via `Repository.UpdateStatus`. `New` opens the record at `pending`.
 - `Environment` is restricted to the two PLAN environments and CHECK-guarded in
   the migration, mirroring the prod←`main` / staging←`dev` invariant.

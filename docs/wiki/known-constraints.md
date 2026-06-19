@@ -7,6 +7,10 @@ truth; flag drift here.
 
 - **production deploys `main`, staging deploys `dev`.** Never wire production to
   `dev`. `deploy.sh` maps env → branch and refuses anything else.
+- **Rollback exception (P6):** `deploy.sh --ref <sha>` does a *detached* checkout
+  of a specific commit instead of `pull --ff-only`, so `tsugi release rollback`
+  can land an older production release. The ref is still a prior point on `main`
+  lineage — prod never points at `dev`. Ref is charset-guarded (`[0-9a-fA-F]{7,40}`).
 
 ## Single VPS
 
@@ -55,8 +59,10 @@ v2.24.4+.
   Tsugi keeps a single unified history — the `deployments.environment` column
   (`staging`/`production`) is the only distinction. Deployment history must be
   queryable across both envs, so it cannot be split per stack.
-- Connection via `TSUGI_DATABASE_URL` (wired in P6). Migrations in `migrations/`
-  (golang-migrate naming) apply to that database.
+- Connection via `TSUGI_DATABASE_URL` (P6: required by `tsugi migrate`/`release`,
+  not by `serve`). Migrations in `migrations/` are embedded and applied with
+  `tsugi migrate up` (tracked in `schema_migrations`); the runner is minimal — no
+  dirty-state recovery, no down-to-version. `down` rolls back the last step only.
 
 ## Scaffold scope (2026-06-19)
 

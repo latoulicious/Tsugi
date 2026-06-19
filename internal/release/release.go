@@ -18,13 +18,14 @@ const (
 	StatusArchived   Status = "archived"
 )
 
-// linear lifecycle from PLAN.md; rollback/abandon edges land in P6
+// lifecycle from PLAN.md; the Archived->Production edge is P6 rollback
+// (re-activate a prior stable release).
 var transitions = map[Status][]Status{
 	StatusDraft:      {StatusCreated},
 	StatusCreated:    {StatusStaging},
 	StatusStaging:    {StatusProduction},
 	StatusProduction: {StatusArchived},
-	StatusArchived:   {},
+	StatusArchived:   {StatusProduction},
 }
 
 func (s Status) Valid() bool {
@@ -113,6 +114,7 @@ type Repository interface {
 	Create(ctx context.Context, r *Release) error
 	GetByVersion(ctx context.Context, version string) (*Release, error)
 	List(ctx context.Context) ([]*Release, error)
+	UpdateStatus(ctx context.Context, id int64, status Status) error
 }
 
 func (r *Release) TransitionTo(target Status) error {

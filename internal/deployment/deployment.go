@@ -35,6 +35,7 @@ var (
 	ErrInvalidReleaseID   = errors.New("deployment: release id must be positive")
 	ErrInvalidEnvironment = errors.New("deployment: invalid environment")
 	ErrInvalidStatus      = errors.New("deployment: invalid status")
+	ErrNotPending         = errors.New("deployment: outcome only settable while pending")
 	ErrNotFound           = errors.New("deployment: not found")
 )
 
@@ -87,9 +88,23 @@ func Rehydrate(id, releaseID int64, env Environment, status Status, deployedAt t
 	}, nil
 }
 
+// MarkSucceeded/MarkFailed record the deploy outcome; only a pending deployment
+// can transition (the executor calls these once the deploy returns).
+func (d *Deployment) MarkSucceeded() error { return d.setOutcome(StatusSucceeded) }
+func (d *Deployment) MarkFailed() error    { return d.setOutcome(StatusFailed) }
+
+func (d *Deployment) setOutcome(s Status) error {
+	if d.Status != StatusPending {
+		return ErrNotPending
+	}
+	d.Status = s
+	return nil
+}
+
 // Repository persists and queries deployment history; pgx impl in internal/postgres.
 type Repository interface {
 	Create(ctx context.Context, d *Deployment) error
 	List(ctx context.Context) ([]*Deployment, error)
 	ListByEnvironment(ctx context.Context, env Environment) ([]*Deployment, error)
+	UpdateStatus(ctx context.Context, id int64, status Status) error
 }

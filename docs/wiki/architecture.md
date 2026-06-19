@@ -48,21 +48,25 @@ release/deployment tables). Per-package docs live in `docs/module/` (not in-code
 godoc).
 
 ```txt
-cmd/tsugi          entrypoint: load config, start server, graceful shutdown
+cmd/tsugi          entrypoint: serve / migrate / release dispatch + wiring
 internal/version   build identity (Version/Commit/Date via ldflags) for /version
-internal/config    env-driven runtime config (TSUGI_ADDR)
+internal/config    env-driven runtime config (TSUGI_ADDR, TSUGI_DATABASE_URL, ...)
 internal/server    HTTP routes: GET /version, GET /healthz
 internal/release   P3 release entity + lifecycle state machine (pure domain)
 internal/changelog P4 conventional-commit changelog generation (pure, no git)
 internal/deployment P5 deployment-history entity + repository port (pure domain)
-internal/postgres  P5 pgx adapter implementing the release/deployment ports
+internal/postgres  P5 pgx adapter + P6 WithTx/Connect + migration runner
+internal/git       P6 git exec wrapper (HeadSHA, Subjects) — changelog input
+internal/deploy    P6 adapter shelling out to deploy/bin/deploy.sh
+internal/cli       P6 release CLI use-cases (create/list/show/promote/rollback)
 ```
 
 Flat layout, parity with the LazyScan-Stack Go services. Domain packages
-(`release`, `deployment`) each define a `Repository` port; the single
-`postgres` package is the infrastructure adapter for both. The remaining DDD
-split (application / interfaces) is deferred to the P6 CLI use-cases. P5 is the
-first external dependency (`github.com/jackc/pgx/v5`).
+(`release`, `deployment`) each define a `Repository` port; `postgres`/`git`/
+`deploy` are the infrastructure adapters; `cli` is the application layer (the
+use-cases). Kept as flat peers, not a `domain/application/infrastructure`
+subtree — matching the rest of the stack. P5 is the first external dependency
+(`github.com/jackc/pgx/v5`).
 
 ## Phases (P1–P6, from `infra-plan.md`)
 
@@ -73,7 +77,7 @@ first external dependency (`github.com/jackc/pgx/v5`).
 | P3 | Release management: release metadata + state machine | **done** — scaffold 2026-06-19 |
 | P4 | Changelog generation from `git log` (conventional commits, no AI) | **done** — scaffold 2026-06-19 |
 | P5 | Deployment tracking: `releases` + `deployments` tables | **done** — scaffold 2026-06-19 |
-| P6 | Promotion & rollback: `release` CLI | planned |
+| P6 | Promotion & rollback: `release` CLI (create/list/show/promote/rollback) | **done** — scaffold 2026-06-19 |
 
 ## Current Behavior (P1 scaffold)
 

@@ -33,6 +33,24 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestMarkOutcome(t *testing.T) {
+	now := time.Date(2026, 6, 19, 20, 0, 0, 0, time.UTC)
+
+	d, _ := New(1, EnvProduction, now)
+	if err := d.MarkSucceeded(); err != nil || d.Status != StatusSucceeded {
+		t.Fatalf("succeeded: err=%v status=%q", err, d.Status)
+	}
+	// already settled — a second outcome is rejected
+	if err := d.MarkFailed(); !errors.Is(err, ErrNotPending) {
+		t.Fatalf("re-mark err = %v, want %v", err, ErrNotPending)
+	}
+
+	d2, _ := New(1, EnvStaging, now)
+	if err := d2.MarkFailed(); err != nil || d2.Status != StatusFailed {
+		t.Fatalf("failed: err=%v status=%q", err, d2.Status)
+	}
+}
+
 func TestRehydrate(t *testing.T) {
 	now := time.Date(2026, 6, 19, 20, 0, 0, 0, time.UTC)
 	d, err := Rehydrate(3, 1, EnvProduction, StatusSucceeded, now)

@@ -22,11 +22,36 @@ curl -s localhost:8080/healthz # {"status":"ok","service":"tsugi"}
 own compose / VPS deploy wiring is not yet built (P5/P6). Package docs:
 `docs/module/`.
 
-## Deploy
+## Release CLI (Phase 6)
+
+The `tsugi` binary drives releases against the `tsugi` Postgres database. All
+CLI paths need `TSUGI_DATABASE_URL` (`serve` does not). `TSUGI_TARGET` defaults
+to `lazyscan`; `TSUGI_DEPLOY_DIR` to `deploy`.
+
+```sh
+export TSUGI_DATABASE_URL="postgres://tsugi:...@127.0.0.1:5432/tsugi"
+
+tsugi migrate up                 # apply embedded migrations (down = last step)
+
+tsugi release create v1.2.0      # snapshot staging commit + changelog -> Staging
+tsugi release list               # version / status / commit / created
+tsugi release show v1.2.0        # detail + changelog
+tsugi release promote v1.2.0     # staging -> production (real prod deploy)
+tsugi release rollback v1.1.5    # redeploy an archived release (deploy.sh --ref)
+```
+
+`promote`/`rollback` run the real `docker compose` deploy on the box, record a
+`deployments` row, and only advance release status when the deploy succeeds.
+Rollback redeploys a specific commit via `deploy.sh --ref <sha>`.
+
+## Deploy (interim script)
+
+`deploy.sh` is still callable directly (and is what the CLI shells out to):
 
 ```sh
 deploy/bin/deploy.sh --target lazyscan --env staging   # dev → staging stack
 deploy/bin/deploy.sh --target lazyscan --env prod      # main → production stack
+deploy/bin/deploy.sh --target lazyscan --env prod --ref <sha>  # rollback a commit
 deploy/bin/deploy.sh --help
 ```
 

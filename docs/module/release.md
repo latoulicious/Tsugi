@@ -23,8 +23,8 @@ pgx adapter lives in [postgres.md](postgres.md)); the CLI is still P6.
 - `Release.Status()` — current state (getter; `status` has no setter).
 - `Release.TransitionTo(target) error` — the only mutator of `status`; enforces
   the transition table.
-- `Repository` (interface) — `Create`, `GetByVersion`, `List`. Consumer-defined
-  port; implemented by `internal/postgres`.
+- `Repository` (interface) — `Create`, `GetByVersion`, `List`, `UpdateStatus`
+  (P6). Consumer-defined port; implemented by `internal/postgres`.
 - Sentinel errors: `ErrEmptyVersion`, `ErrInvalidVersion`, `ErrEmptyCommit`,
   `ErrSameCommit`, `ErrInvalidStatus`, `ErrInvalidTransition`, `ErrNotFound`.
 
@@ -32,11 +32,12 @@ pgx adapter lives in [postgres.md](postgres.md)); the CLI is still P6.
 
 ```txt
 Draft → Created → Staging → Production → Archived
+                                            ↑ ──── ┘  (P6 rollback)
 ```
 
-Strictly linear, taken verbatim from `PLAN.md`. Rollback (Production → previous
-release) and abandon edges are **not** modelled here — they are P6 promotion/
-rollback semantics, added when the CLI defines them.
+Linear from `PLAN.md`, plus the P6 `Archived → Production` edge: rollback
+re-activates a previously archived release. Promotion archives the prior
+production release, so only one release is in `Production` at a time.
 
 ## Notes
 

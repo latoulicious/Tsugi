@@ -5,10 +5,12 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: deploy.sh --target <name> --env <prod|staging>
+Usage: deploy.sh --target <name> --env <prod|staging> [--ref <sha>]
 
 Resolves branch (prod->main, staging->dev), compose project, override, and
 env-file, then runs `docker compose ... up -d` against the target checkout.
+With --ref, checks out that commit (detached) instead of the branch HEAD —
+used by `tsugi release rollback` to redeploy a previous release.
 
 Targets live in deploy/targets/<name>/ with a target.env config.
 EOF
@@ -16,10 +18,12 @@ EOF
 
 TARGET=""
 ENV=""
+REF=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --target) TARGET="${2:-}"; shift 2 ;;
     --env)    ENV="${2:-}"; shift 2 ;;
+    --ref)    REF="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown arg: $1" >&2; usage; exit 2 ;;
   esac
@@ -29,6 +33,9 @@ done
 
 # Guard the path/source input: no traversal, no odd chars.
 [[ "$TARGET" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "invalid --target: $TARGET" >&2; exit 2; }
+
+# Guard --ref: a git SHA only (no branch names or options into checkout).
+[[ -z "$REF" || "$REF" =~ ^[0-9a-fA-F]{7,40}$ ]] || { echo "invalid --ref: $REF" >&2; exit 2; }
 
 # env -> branch + checkout (the prod←main / staging←dev invariant).
 case "$ENV" in
@@ -59,10 +66,14 @@ ENV_FILE="$TARGET_DIR/.env.$ENV"
 OVERRIDE="$TARGET_DIR/docker-compose.$ENV.override.yml"
 PROJECT="$TARGET-$ENV"
 
-echo "==> $PROJECT  branch=$BRANCH  checkout=$CHECKOUT"
+echo "==> $PROJECT  branch=$BRANCH  ref=${REF:-HEAD}  checkout=$CHECKOUT"
 git -C "$CHECKOUT" fetch --prune origin
-git -C "$CHECKOUT" checkout "$BRANCH"
-git -C "$CHECKOUT" pull --ff-only origin "$BRANCH"
+if [[ -n "$REF" ]]; then
+  git -C "$CHECKOUT" checkout --detach "$REF"
+else
+  git -C "$CHECKOUT" checkout "$BRANCH"
+  git -C "$CHECKOUT" pull --ff-only origin "$BRANCH"
+fi
 
 COMPOSE_ARGS=(-p "$PROJECT" -f "$CHECKOUT/$BASE_COMPOSE")
 [[ -f "$OVERRIDE" ]] && COMPOSE_ARGS+=(-f "$OVERRIDE")

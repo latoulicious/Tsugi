@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/latoulicious/Tsugi/internal/deployment"
@@ -15,28 +16,60 @@ import (
 
 const queryTimeout = 5 * time.Second
 
+// DBTX is the query surface shared by the pool and a transaction, so the repos
+// run the same code inside or outside WithTx.
+type DBTX interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
+
 // Store aggregates the pgx-backed repositories over one pool.
-// ponytail: no WithTx/DBTX yet — no atomic multi-write use case until P6 promotion.
 type Store struct {
+	pool        *pgxpool.Pool
 	Releases    release.Repository
 	Deployments deployment.Repository
 }
 
 func New(pool *pgxpool.Pool) *Store {
 	return &Store{
-		Releases:    &releaseRepo{pool: pool},
-		Deployments: &deploymentRepo{pool: pool},
+		pool:        pool,
+		Releases:    &releaseRepo{db: pool},
+		Deployments: &deploymentRepo{db: pool},
 	}
 }
 
-type releaseRepo struct{ pool *pgxpool.Pool }
+// Connect opens a pgx pool; the caller owns Close.
+func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("connect postgres: %w", err)
+	}
+	return pool, nil
+}
+
+// WithTx runs fn against tx-scoped repos, committing on success. Promotion and
+// rollback advance release status and the deployment outcome together.
+func (s *Store) WithTx(ctx context.Context, fn func(release.Repository, deployment.Repository) error) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if err := fn(&releaseRepo{db: tx}, &deploymentRepo{db: tx}); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+type releaseRepo struct{ db DBTX }
 
 func (r *releaseRepo) Create(ctx context.Context, rel *release.Release) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 	const q = `INSERT INTO releases (version, commit_sha, previous_commit_sha, changelog, status, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		rel.Version, rel.CommitSHA, rel.PreviousCommitSHA, rel.Changelog, string(rel.Status()), rel.CreatedAt)
 	if err := row.Scan(&rel.ID); err != nil {
 		return fmt.Errorf("insert release: %w", err)
@@ -49,7 +82,7 @@ func (r *releaseRepo) GetByVersion(ctx context.Context, version string) (*releas
 	defer cancel()
 	const q = `SELECT id, version, commit_sha, previous_commit_sha, changelog, status, created_at
 		FROM releases WHERE version = $1`
-	rel, err := scanRelease(r.pool.QueryRow(ctx, q, version))
+	rel, err := scanRelease(r.db.QueryRow(ctx, q, version))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, release.ErrNotFound
 	}
@@ -61,7 +94,7 @@ func (r *releaseRepo) List(ctx context.Context) ([]*release.Release, error) {
 	defer cancel()
 	const q = `SELECT id, version, commit_sha, previous_commit_sha, changelog, status, created_at
 		FROM releases ORDER BY created_at DESC`
-	rows, err := r.pool.Query(ctx, q)
+	rows, err := r.db.Query(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("query releases: %w", err)
 	}
@@ -75,6 +108,20 @@ func (r *releaseRepo) List(ctx context.Context) ([]*release.Release, error) {
 		out = append(out, rel)
 	}
 	return out, rows.Err()
+}
+
+func (r *releaseRepo) UpdateStatus(ctx context.Context, id int64, status release.Status) error {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+	const q = `UPDATE releases SET status = $2 WHERE id = $1`
+	tag, err := r.db.Exec(ctx, q, id, string(status))
+	if err != nil {
+		return fmt.Errorf("update release status: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return release.ErrNotFound
+	}
+	return nil
 }
 
 // scanRow is the read surface shared by QueryRow and Rows (both expose Scan).
@@ -98,14 +145,14 @@ func scanRelease(row scanRow) (*release.Release, error) {
 	return release.Rehydrate(id, version, commit, prev, changelog, release.Status(status), createdAt)
 }
 
-type deploymentRepo struct{ pool *pgxpool.Pool }
+type deploymentRepo struct{ db DBTX }
 
 func (d *deploymentRepo) Create(ctx context.Context, dep *deployment.Deployment) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 	const q = `INSERT INTO deployments (release_id, environment, status, deployed_at)
 		VALUES ($1, $2, $3, $4) RETURNING id`
-	row := d.pool.QueryRow(ctx, q, dep.ReleaseID, string(dep.Environment), string(dep.Status), dep.DeployedAt)
+	row := d.db.QueryRow(ctx, q, dep.ReleaseID, string(dep.Environment), string(dep.Status), dep.DeployedAt)
 	if err := row.Scan(&dep.ID); err != nil {
 		return fmt.Errorf("insert deployment: %w", err)
 	}
@@ -128,8 +175,22 @@ func (d *deploymentRepo) ListByEnvironment(ctx context.Context, env deployment.E
 	return d.queryDeployments(ctx, q, string(env))
 }
 
+func (d *deploymentRepo) UpdateStatus(ctx context.Context, id int64, status deployment.Status) error {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+	const q = `UPDATE deployments SET status = $2 WHERE id = $1`
+	tag, err := d.db.Exec(ctx, q, id, string(status))
+	if err != nil {
+		return fmt.Errorf("update deployment status: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return deployment.ErrNotFound
+	}
+	return nil
+}
+
 func (d *deploymentRepo) queryDeployments(ctx context.Context, q string, args ...any) ([]*deployment.Deployment, error) {
-	rows, err := d.pool.Query(ctx, q, args...)
+	rows, err := d.db.Query(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query deployments: %w", err)
 	}
