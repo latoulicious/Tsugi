@@ -52,6 +52,7 @@ internal/version   build identity (Version/Commit/Date via ldflags) for /version
 internal/config    env-driven runtime config (TSUGI_ADDR)
 internal/server    HTTP routes: GET /version, GET /healthz
 internal/release   P3 release entity + lifecycle state machine (pure domain)
+internal/changelog P4 conventional-commit changelog generation (pure, no git)
 ```
 
 Flat layout, parity with the LazyScan-Stack Go services. P3 adds the `release`
@@ -66,7 +67,7 @@ need it. No repository port yet (lands in P5 with the pgx impl).
 | P1 | Environment separation: staging/prod containers, domains, deploy targets | **in progress** — scaffold 2026-06-19 |
 | P2 | Version visibility: `GET /version` (version, commit, deployed_at) | **done** — scaffold 2026-06-19 |
 | P3 | Release management: release metadata + state machine | **done** — scaffold 2026-06-19 |
-| P4 | Changelog generation from `git log` (conventional commits, no AI) | planned |
+| P4 | Changelog generation from `git log` (conventional commits, no AI) | **done** — scaffold 2026-06-19 |
 | P5 | Deployment tracking: `releases` + `deployments` tables | planned |
 | P6 | Promotion & rollback: `release` CLI | planned |
 

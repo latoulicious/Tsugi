@@ -6,9 +6,9 @@ kept verbatim below for history.
 
 Type: Go release-promotion + deployment-orchestration service + CLI.
 
-Status: **P3 scaffold done** — `release` domain entity + state machine
-(2026-06-19). P2 `GET /version` service (2026-06-19). P1 environment-separation
-scaffold (2026-06-19).
+Status: **P4 scaffold done** — `changelog` conventional-commit generator
+(2026-06-19). P3 `release` domain entity + state machine (2026-06-19). P2 `GET
+/version` service (2026-06-19). P1 environment-separation scaffold (2026-06-19).
 
 ## 2026-06-19 Update — Phase 1 scaffold (environment separation)
 
@@ -62,6 +62,26 @@ scaffold (2026-06-19).
   wiring. `GET /version` untouched. Rollback/abandon transitions are P6 semantics
   and intentionally not modelled.
 - Package doc in `docs/module/release.md` (project pref: no in-code godoc).
+
+## 2026-06-19 Update — Phase 4 scaffold (changelog generation)
+
+- New flat package `internal/changelog` (peer to `release`/`version`), **stdlib
+  only**. Pure: turns conventional-commit subjects into grouped markdown notes,
+  no git, no AI, no persistence.
+- **API**: `Parse(subject) (Entry, bool)` parses one `type(scope)?!?: desc`
+  subject (type lowercased, scope + breaking `!` stripped, `ok=false` for
+  non-conventional lines); `Generate([]string) string` groups by type and renders
+  `feat → Features`, `fix → Fixes`, `refactor → Improvements` in that order.
+  Unmapped types and noise are skipped; empty input → `_No notable changes._`.
+- **Git deferred**: `git log previous_sha..current_sha` is the intended source,
+  but `Generate` takes a plain `[]string` so it stays pure/unit-testable. The git
+  exec lands with the P6 CLI (`release create`) that calls it — same precedent as
+  P3 deferring its repository adapter (no untested I/O glue this phase).
+- **No `release.go` change**: persistence (`releases.changelog`) is P5; P4 only
+  produces the string. No public contract or runtime behavior change.
+- **Tests**: table-driven, stdlib `testing` (zero-deps invariant — no testify).
+  Cover parse (scope/`!`/case/noise) and generate (ordering, drop, empty).
+- Package doc in `docs/module/changelog.md` (project pref: no in-code godoc).
 
 Original plan below kept as-is for history.
 

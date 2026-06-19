@@ -13,10 +13,11 @@ drift.
 | config | `internal/config` | [config.md](config.md) — env-driven runtime config |
 | server | `internal/server` | [server.md](server.md) — HTTP routes `/version`, `/healthz` |
 | release | `internal/release` | [release.md](release.md) — P3 release entity + lifecycle state machine |
+| changelog | `internal/changelog` | [changelog.md](changelog.md) — P4 conventional-commit changelog generation |
 
 ## Layering
 
-Flat `internal/{config,server,version,release}` layout — parity with the
+Flat `internal/{config,server,version,release,changelog}` layout — parity with the
 LazyScan-Stack Go services (Aegis/Herald/Kiln), which are also flat. P3 adds the
 first domain package (`release`) as a peer, not a `domain/` subtree: the layered
 split (`application` / `infrastructure` / `interfaces`) is deferred until P5
