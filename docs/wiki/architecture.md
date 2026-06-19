@@ -43,15 +43,25 @@ target's own compose.
 
 ## Packages
 
-None yet. Phase 1 is infra-only (`deploy/`); `go.mod`, `cmd/tsugi`, and
-`internal/` arrive with Phase 2 (deps/dirs land with their phase).
+The Go service lands with Phase 2 (stdlib only — pgx arrives with the P5
+tables). Per-package docs live in `docs/module/` (not in-code godoc).
+
+```txt
+cmd/tsugi          entrypoint: load config, start server, graceful shutdown
+internal/version   build identity (Version/Commit/Date via ldflags) for /version
+internal/config    env-driven runtime config (TSUGI_ADDR)
+internal/server    HTTP routes: GET /version, GET /healthz
+```
+
+Flat layout, parity with the LazyScan-Stack Go services. Full DDD layering is
+deferred to P3+ when domain models (`releases`, `deployments`) appear.
 
 ## Phases (P1–P6, from `infra-plan.md`)
 
 | Phase | What | Status |
 |---|---|---|
 | P1 | Environment separation: staging/prod containers, domains, deploy targets | **in progress** — scaffold 2026-06-19 |
-| P2 | Version visibility: `GET /version` (version, commit, deployed_at) | planned |
+| P2 | Version visibility: `GET /version` (version, commit, deployed_at) | **done** — scaffold 2026-06-19 |
 | P3 | Release management: release metadata + state machine | planned |
 | P4 | Changelog generation from `git log` (conventional commits, no AI) | planned |
 | P5 | Deployment tracking: `releases` + `deployments` tables | planned |

@@ -6,7 +6,8 @@ kept verbatim below for history.
 
 Type: Go release-promotion + deployment-orchestration service + CLI.
 
-Status: **P1 in progress** — environment-separation scaffold (2026-06-19).
+Status: **P2 scaffold done** — `GET /version` service (2026-06-19). P1
+environment-separation scaffold (2026-06-19).
 
 ## 2026-06-19 Update — Phase 1 scaffold (environment separation)
 
@@ -28,6 +29,20 @@ Status: **P1 in progress** — environment-separation scaffold (2026-06-19).
   one small VPS roughly doubles memory — the prod compose is already trimmed for
   4 GB. A lighter shared-backing-services variant is possible later.
 - Go skeleton (`go.mod`, `cmd/tsugi`, `internal/`) deliberately deferred to P2.
+
+## 2026-06-19 Update — Phase 2 scaffold (version visibility)
+
+- First Go code. Module `github.com/latoulicious/Tsugi`, go 1.26, **stdlib
+  only** (pgx deferred to P5). `cmd/tsugi` + `internal/{version,config,server}`.
+- `GET /version` → `{version, commit, deployed_at}`; `GET /healthz` for compose
+  healthcheck parity. `net/http` + `slog` + graceful shutdown — mirrors Aegis.
+- **Build identity** stamped at link time (`-X` ldflags) from git via the
+  `Makefile`; `Dockerfile` takes the same as `--build-arg`. `deployed_at` =
+  build time (rebuild-on-deploy ⇒ build ≈ deploy). Local `go build` falls back
+  to the embedded VCS stamp (`debug.ReadBuildInfo`).
+- Package docs in `docs/module/` (project preference: no in-code godoc).
+- **Deferred**: Tsugi's own compose / VPS deploy wiring (overlaps P5/P6); the
+  service is build- and run-validated locally only.
 
 Original plan below kept as-is for history.
 

@@ -4,6 +4,24 @@ Phase 1 deploy runbook. `deploy/bin/deploy.sh` is the interim deployer; the Go
 `release` CLI replaces it in Phase 6. Run it on the VPS — it operates on local
 checkouts and the local Docker daemon.
 
+## Tsugi service (Phase 2)
+
+The Go service exposes `GET /version`. Build stamps version/commit/date from
+git via ldflags; defaults are `dev`/`none`/`unknown`.
+
+```sh
+make build && ./bin/tsugi      # listens on :8080 (override TSUGI_ADDR)
+make image                     # docker image, same metadata via --build-arg
+make test && make vet
+
+curl -s localhost:8080/version # {"version":"v1.2.0","commit":"abc123","deployed_at":"...Z"}
+curl -s localhost:8080/healthz # {"status":"ok","service":"tsugi"}
+```
+
+`deployed_at` is build time (rebuild-on-deploy ⇒ build ≈ deploy). The service's
+own compose / VPS deploy wiring is not yet built (P5/P6). Package docs:
+`docs/module/`.
+
 ## Deploy
 
 ```sh
