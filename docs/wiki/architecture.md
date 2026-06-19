@@ -51,10 +51,13 @@ cmd/tsugi          entrypoint: load config, start server, graceful shutdown
 internal/version   build identity (Version/Commit/Date via ldflags) for /version
 internal/config    env-driven runtime config (TSUGI_ADDR)
 internal/server    HTTP routes: GET /version, GET /healthz
+internal/release   P3 release entity + lifecycle state machine (pure domain)
 ```
 
-Flat layout, parity with the LazyScan-Stack Go services. Full DDD layering is
-deferred to P3+ when domain models (`releases`, `deployments`) appear.
+Flat layout, parity with the LazyScan-Stack Go services. P3 adds the `release`
+domain package as a peer; the layered DDD split (application / infrastructure /
+interfaces) is deferred to P5 persistence and P6 CLI, when adapters/use-cases
+need it. No repository port yet (lands in P5 with the pgx impl).
 
 ## Phases (P1–P6, from `infra-plan.md`)
 
@@ -62,7 +65,7 @@ deferred to P3+ when domain models (`releases`, `deployments`) appear.
 |---|---|---|
 | P1 | Environment separation: staging/prod containers, domains, deploy targets | **in progress** — scaffold 2026-06-19 |
 | P2 | Version visibility: `GET /version` (version, commit, deployed_at) | **done** — scaffold 2026-06-19 |
-| P3 | Release management: release metadata + state machine | planned |
+| P3 | Release management: release metadata + state machine | **done** — scaffold 2026-06-19 |
 | P4 | Changelog generation from `git log` (conventional commits, no AI) | planned |
 | P5 | Deployment tracking: `releases` + `deployments` tables | planned |
 | P6 | Promotion & rollback: `release` CLI | planned |

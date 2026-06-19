@@ -12,11 +12,12 @@ drift.
 | version | `internal/version` | [version.md](version.md) — build identity for `GET /version` |
 | config | `internal/config` | [config.md](config.md) — env-driven runtime config |
 | server | `internal/server` | [server.md](server.md) — HTTP routes `/version`, `/healthz` |
+| release | `internal/release` | [release.md](release.md) — P3 release entity + lifecycle state machine |
 
 ## Layering
 
-Phase 2 is a flat `internal/{config,server,version}` layout — parity with the
-LazyScan-Stack Go services (Aegis/Herald/Kiln), which are also flat. Full DDD
-layering (`domain` / `application` / `infrastructure` / `interfaces`) is
-deferred to P3+ when the `releases` and `deployments` models arrive; there is no
-domain entity to model yet.
+Flat `internal/{config,server,version,release}` layout — parity with the
+LazyScan-Stack Go services (Aegis/Herald/Kiln), which are also flat. P3 adds the
+first domain package (`release`) as a peer, not a `domain/` subtree: the layered
+split (`application` / `infrastructure` / `interfaces`) is deferred until P5
+persistence and P6 CLI add adapters and use-cases that need it.

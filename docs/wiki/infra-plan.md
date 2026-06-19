@@ -6,8 +6,9 @@ kept verbatim below for history.
 
 Type: Go release-promotion + deployment-orchestration service + CLI.
 
-Status: **P2 scaffold done** — `GET /version` service (2026-06-19). P1
-environment-separation scaffold (2026-06-19).
+Status: **P3 scaffold done** — `release` domain entity + state machine
+(2026-06-19). P2 `GET /version` service (2026-06-19). P1 environment-separation
+scaffold (2026-06-19).
 
 ## 2026-06-19 Update — Phase 1 scaffold (environment separation)
 
@@ -43,6 +44,24 @@ environment-separation scaffold (2026-06-19).
 - Package docs in `docs/module/` (project preference: no in-code godoc).
 - **Deferred**: Tsugi's own compose / VPS deploy wiring (overlaps P5/P6); the
   service is build- and run-validated locally only.
+
+## 2026-06-19 Update — Phase 3 scaffold (release management)
+
+- First domain code. New flat package `internal/release` (peer to
+  `version`/`config`/`server`), **stdlib only**. Models the P3 metadata exactly:
+  `Version`, `CommitSHA`, `PreviousCommitSHA`, `CreatedAt`, `Status`.
+- **State machine**: `Status` with the five PLAN states and a linear transition
+  table `Draft → Created → Staging → Production → Archived`. `status` is guarded
+  (unexported + `Status()` getter); `TransitionTo` is the only mutator and
+  enforces the table. `New` validates and starts at `Draft`, with `createdAt`
+  injected (no hidden clock).
+- **Tests**: table-driven, stdlib `testing` (keeps the zero-deps invariant — no
+  testify). Cover `New` validation, valid/invalid transitions, full lifecycle.
+- **Deferred** (phase boundary): no repository port (P5, with the pgx impl — no
+  port without an adapter), no DB/migrations (P5), no `release` CLI (P6), no HTTP
+  wiring. `GET /version` untouched. Rollback/abandon transitions are P6 semantics
+  and intentionally not modelled.
+- Package doc in `docs/module/release.md` (project pref: no in-code godoc).
 
 Original plan below kept as-is for history.
 
