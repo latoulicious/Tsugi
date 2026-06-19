@@ -1,0 +1,10 @@
+# Tsugi staging port shift for the lazyscan stack (avoid prod clash on one VPS).
+# !override replaces the base port list instead of appending it (compose >=2.24.4).
+services:
+  aegis:
+    ports: !override
+      - "127.0.0.1:8081:8080"
+  minio:
+    ports: !override
+      - "127.0.0.1:9100:9000"
+      - "127.0.0.1:9101:9001"

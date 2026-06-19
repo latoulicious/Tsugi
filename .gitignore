@@ -1,0 +1,18 @@
+# Secrets — keep only the *.example templates.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Cloudflared real config + credentials (keep *.example).
+deploy/targets/**/cloudflared/config.yml
+deploy/targets/**/cloudflared/*.json
+
+# Local / editor / OS noise.
+*.log
+tmp/
+.DS_Store
+
+# Go build output (arrives Phase 2).
+/bin/tsugi
+*.test
