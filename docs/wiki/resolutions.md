@@ -45,3 +45,14 @@ Format per resolution:
   JSON payload; CodeRabbit re-run → 0 findings.
 - constraints honored: smallest safe change; `deployed_at` contract unchanged;
   comment ≤2 lines; no unrelated cleanup.
+
+## R-004 Distinct `ErrInvalidID` in `Rehydrate`  (resolves F-006)
+- date: 2026-06-19
+- change: Added `ErrInvalidID` sentinel and split the `Rehydrate` guard so
+  `id <= 0` returns it and `releaseID <= 0` returns `ErrInvalidReleaseID`,
+  instead of one combined check reporting the release-id error for both.
+- files: internal/deployment/deployment.go, internal/deployment/deployment_test.go
+- verification: `go vet` clean; `go test ./internal/deployment/` green (added a
+  zero-`releaseID` case alongside the zero-`id` case); `gofmt` clean.
+- constraints honored: smallest safe change; `New` path untouched; no public
+  behavior change beyond the more precise error; no unrelated cleanup.

@@ -65,3 +65,14 @@ Format per finding:
 - problem: streaming `json.NewEncoder(w).Encode` writes the 200 header before a
   possible encode error, leaving an incomplete body under a success status.
 - status: resolved (→ R-003)
+
+## F-006 `Rehydrate` returns `ErrInvalidReleaseID` for an invalid `id`
+- date: 2026-06-19
+- source: CodeRabbit CLI (`coderabbit review --agent`), Phase 5 scaffold
+- severity: low (reported minor)
+- location: internal/deployment/deployment.go:68
+- problem: `Rehydrate` collapses `id <= 0 || releaseID <= 0` into one check that
+  always returns `ErrInvalidReleaseID`, so a bad `id` is misreported as a bad
+  `releaseID`. Both come from the DB row, so it is a defensive guard, not a
+  user-facing path.
+- status: resolved (→ R-004)

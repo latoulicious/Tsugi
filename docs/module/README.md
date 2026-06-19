@@ -14,11 +14,14 @@ drift.
 | server | `internal/server` | [server.md](server.md) — HTTP routes `/version`, `/healthz` |
 | release | `internal/release` | [release.md](release.md) — P3 release entity + lifecycle state machine |
 | changelog | `internal/changelog` | [changelog.md](changelog.md) — P4 conventional-commit changelog generation |
+| deployment | `internal/deployment` | [deployment.md](deployment.md) — P5 deployment-history entity + repository port |
+| postgres | `internal/postgres` | [postgres.md](postgres.md) — P5 pgx adapter for the release/deployment ports |
 
 ## Layering
 
-Flat `internal/{config,server,version,release,changelog}` layout — parity with the
-LazyScan-Stack Go services (Aegis/Herald/Kiln), which are also flat. P3 adds the
-first domain package (`release`) as a peer, not a `domain/` subtree: the layered
-split (`application` / `infrastructure` / `interfaces`) is deferred until P5
-persistence and P6 CLI add adapters and use-cases that need it.
+Flat `internal/{config,server,version,release,changelog,deployment,postgres}`
+layout — parity with the LazyScan-Stack Go services (Aegis/Herald/Kiln), which
+are also flat. Domain packages (`release`, `deployment`) define their own
+`Repository` port; the single `postgres` package is the infrastructure adapter
+implementing both. No `application`/`interfaces` split yet — that arrives with
+the P6 CLI use-cases.

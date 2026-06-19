@@ -46,6 +46,18 @@ v2.24.4+.
 - Base compose builds from contexts relative to its own dir, so the VPS checkout
   must be the full LazyScan-Stack repo at the env-specific path.
 
+## Tsugi's own storage (P5+)
+
+- Tsugi's `releases`/`deployments` tables live on the **existing shared
+  Postgres** the box already runs (`postgres:16-alpine`, same instance as
+  LazyScan), in its own `tsugi` database. No dedicated container.
+- **One instance, both environments.** Unlike the target's per-stack isolation,
+  Tsugi keeps a single unified history — the `deployments.environment` column
+  (`staging`/`production`) is the only distinction. Deployment history must be
+  queryable across both envs, so it cannot be split per stack.
+- Connection via `TSUGI_DATABASE_URL` (wired in P6). Migrations in `migrations/`
+  (golang-migrate naming) apply to that database.
+
 ## Scaffold scope (2026-06-19)
 
 - Config + runbook only. No live VPS changes, no real secrets, no `docker

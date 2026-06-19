@@ -6,9 +6,11 @@ kept verbatim below for history.
 
 Type: Go release-promotion + deployment-orchestration service + CLI.
 
-Status: **P4 scaffold done** — `changelog` conventional-commit generator
-(2026-06-19). P3 `release` domain entity + state machine (2026-06-19). P2 `GET
-/version` service (2026-06-19). P1 environment-separation scaffold (2026-06-19).
+Status: **P5 scaffold done** — `deployment` entity + `postgres` pgx adapter +
+`releases`/`deployments` migrations (2026-06-19). P4 `changelog` conventional-
+commit generator (2026-06-19). P3 `release` domain entity + state machine
+(2026-06-19). P2 `GET /version` service (2026-06-19). P1 environment-separation
+scaffold (2026-06-19).
 
 ## 2026-06-19 Update — Phase 1 scaffold (environment separation)
 
@@ -82,6 +84,36 @@ Status: **P4 scaffold done** — `changelog` conventional-commit generator
 - **Tests**: table-driven, stdlib `testing` (zero-deps invariant — no testify).
   Cover parse (scope/`!`/case/noise) and generate (ordering, drop, empty).
 - Package doc in `docs/module/changelog.md` (project pref: no in-code godoc).
+
+## 2026-06-19 Update — Phase 5 scaffold (deployment tracking)
+
+- New domain package `internal/deployment` (peer to `release`): `Deployment`
+  entity (`ID`, `ReleaseID`, `Environment`, `Status`, `DeployedAt`), `New`
+  (opens at `pending`) + `Rehydrate` for DB reads, and a `Repository` port.
+- `internal/release` gained an additive `ID int64` + `Changelog` field, a
+  `Rehydrate` constructor (sets `status` directly — DB reads bypass the state
+  machine; `New` stays Draft-only, guard holds for live objects), `ErrNotFound`,
+  and a `Repository` port. No behavior change to `New`/`TransitionTo`.
+- **First external dependency**: `github.com/jackc/pgx/v5`. New `internal/postgres`
+  package is the single adapter implementing both ports (`Store` aggregating
+  `releaseRepo`/`deploymentRepo` — split because both ports declare `Create`).
+  Per-call timeout, `RETURNING id`, `pgx.ErrNoRows → domain ErrNotFound`.
+- **Migrations**: plain `migrations/000001_create_releases.{up,down}.sql` and
+  `000002_create_deployments.{up,down}.sql` (golang-migrate naming, no tool/lib
+  added). Schema matches PLAN exactly + CHECK guards on status/environment, FK
+  `deployments.release_id → releases.id`, index `(environment, deployed_at)`.
+- **Storage placement** (per user): Tsugi reuses the box's existing shared
+  Postgres (same instance as LazyScan) in a `tsugi` database — no dedicated
+  container. One instance holds both environments' history (`environment`
+  column), since deployment history must be queryable across staging+prod.
+- **Deferred to P6**: DB wiring in `cmd/tsugi` (`TSUGI_DATABASE_URL` + pool),
+  migration runner, deployment outcome transitions (`pending → succeeded/failed`),
+  `WithTx`/DBTX (no atomic multi-write yet), and DB integration test (needs a
+  live Postgres). `GET /version`/`/healthz` untouched; service still starts
+  without a DB.
+- **Doc drift flagged**: architecture.md earlier said the repository "port lands
+  in P5 with the pgx impl" — done as stated. The `release` doc note that there
+  was "no repository port yet" is now stale and updated.
 
 Original plan below kept as-is for history.
 

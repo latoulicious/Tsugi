@@ -43,8 +43,9 @@ target's own compose.
 
 ## Packages
 
-The Go service lands with Phase 2 (stdlib only — pgx arrives with the P5
-tables). Per-package docs live in `docs/module/` (not in-code godoc).
+The Go service lands with Phase 2 (stdlib only until P5, which adds pgx for the
+release/deployment tables). Per-package docs live in `docs/module/` (not in-code
+godoc).
 
 ```txt
 cmd/tsugi          entrypoint: load config, start server, graceful shutdown
@@ -53,12 +54,15 @@ internal/config    env-driven runtime config (TSUGI_ADDR)
 internal/server    HTTP routes: GET /version, GET /healthz
 internal/release   P3 release entity + lifecycle state machine (pure domain)
 internal/changelog P4 conventional-commit changelog generation (pure, no git)
+internal/deployment P5 deployment-history entity + repository port (pure domain)
+internal/postgres  P5 pgx adapter implementing the release/deployment ports
 ```
 
-Flat layout, parity with the LazyScan-Stack Go services. P3 adds the `release`
-domain package as a peer; the layered DDD split (application / infrastructure /
-interfaces) is deferred to P5 persistence and P6 CLI, when adapters/use-cases
-need it. No repository port yet (lands in P5 with the pgx impl).
+Flat layout, parity with the LazyScan-Stack Go services. Domain packages
+(`release`, `deployment`) each define a `Repository` port; the single
+`postgres` package is the infrastructure adapter for both. The remaining DDD
+split (application / interfaces) is deferred to the P6 CLI use-cases. P5 is the
+first external dependency (`github.com/jackc/pgx/v5`).
 
 ## Phases (P1–P6, from `infra-plan.md`)
 
@@ -68,7 +72,7 @@ need it. No repository port yet (lands in P5 with the pgx impl).
 | P2 | Version visibility: `GET /version` (version, commit, deployed_at) | **done** — scaffold 2026-06-19 |
 | P3 | Release management: release metadata + state machine | **done** — scaffold 2026-06-19 |
 | P4 | Changelog generation from `git log` (conventional commits, no AI) | **done** — scaffold 2026-06-19 |
-| P5 | Deployment tracking: `releases` + `deployments` tables | planned |
+| P5 | Deployment tracking: `releases` + `deployments` tables | **done** — scaffold 2026-06-19 |
 | P6 | Promotion & rollback: `release` CLI | planned |
 
 ## Current Behavior (P1 scaffold)

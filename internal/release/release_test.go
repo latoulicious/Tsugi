@@ -70,6 +70,24 @@ func TestTransitionTo(t *testing.T) {
 	}
 }
 
+func TestRehydrate(t *testing.T) {
+	now := time.Date(2026, 6, 19, 20, 0, 0, 0, time.UTC)
+	r, err := Rehydrate(7, "v1.2.0", "abc123", "def456", "## Features\n", StatusProduction, now)
+	if err != nil {
+		t.Fatalf("rehydrate: %v", err)
+	}
+	if r.ID != 7 || r.Changelog != "## Features\n" || r.Status() != StatusProduction {
+		t.Fatalf("got id=%d changelog=%q status=%q", r.ID, r.Changelog, r.Status())
+	}
+
+	if _, err := Rehydrate(7, "v1.2.0", "abc123", "", "", Status("bogus"), now); !errors.Is(err, ErrInvalidStatus) {
+		t.Fatalf("bad status err = %v, want %v", err, ErrInvalidStatus)
+	}
+	if _, err := Rehydrate(7, "", "abc123", "", "", StatusDraft, now); !errors.Is(err, ErrEmptyVersion) {
+		t.Fatalf("propagates New validation err = %v, want %v", err, ErrEmptyVersion)
+	}
+}
+
 func TestLifecycle(t *testing.T) {
 	r, err := New("v1.2.0", "abc123", "def456", time.Unix(0, 0).UTC())
 	if err != nil {
