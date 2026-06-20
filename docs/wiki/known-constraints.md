@@ -34,6 +34,9 @@ port list; plain merge would append and double-bind). Needs Docker Compose
 v2.24.4+. On the box `8080` is dozzle and `8081` is the live prod stack, so
 staging takes `8082`.
 
+`tsugi serve` defaults to `127.0.0.1:8090` (loopback; the tunnel fronts it) to
+avoid the `8080` dozzle clash. Override with `TSUGI_ADDR`.
+
 ## Routing — Cloudflare Tunnel
 
 - Two app hostnames on the shared `vps` tunnel: `lazyscan.my.id` → 8081,

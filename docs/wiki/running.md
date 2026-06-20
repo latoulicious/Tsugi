@@ -10,12 +10,13 @@ The Go service exposes `GET /version`. Build stamps version/commit/date from
 git via ldflags; defaults are `dev`/`none`/`unknown`.
 
 ```sh
-make build && ./bin/tsugi      # listens on :8080 (override TSUGI_ADDR)
+make build && ./bin/tsugi      # listens on 127.0.0.1:8090 (override TSUGI_ADDR)
 make image                     # docker image, same metadata via --build-arg
+make install                   # extract the static binary to /usr/local/bin (PREFIX overridable)
 make test && make vet
 
-curl -s localhost:8080/version # {"version":"v1.2.0","commit":"abc123","deployed_at":"...Z"}
-curl -s localhost:8080/healthz # {"status":"ok","service":"tsugi"}
+curl -s 127.0.0.1:8090/version # {"version":"v1.2.0","commit":"abc123","deployed_at":"...Z"}
+curl -s 127.0.0.1:8090/healthz # {"status":"ok","service":"tsugi"}
 ```
 
 `deployed_at` is build time (rebuild-on-deploy ⇒ build ≈ deploy). The service's
@@ -27,6 +28,11 @@ own compose / VPS deploy wiring is not yet built (P5/P6). Package docs:
 The `tsugi` binary drives releases against the `tsugi` Postgres database. All
 CLI paths need `TSUGI_DATABASE_URL` (`serve` does not). `TSUGI_TARGET` defaults
 to `lazyscan`; `TSUGI_DEPLOY_DIR` to `deploy`.
+
+Runtime is the host static binary (it shells `deploy.sh`, needs host
+git/docker/checkouts); the image is build+migrate only — install via `make install`.
+Only `create` reads `target.env` (for the staging checkout); `list`/`show`/
+`promote`/`rollback` do not.
 
 ```sh
 export TSUGI_DATABASE_URL="postgres://tsugi:...@127.0.0.1:5432/tsugi"

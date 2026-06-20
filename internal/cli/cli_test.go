@@ -97,14 +97,15 @@ func newApp(g fakeGit, dep *fakeDeployer) (*App, *fakeReleases, *fakeDeployments
 	deps := &fakeDeployments{}
 	buf := &bytes.Buffer{}
 	app := &App{
-		Releases:    rels,
-		Deployments: deps,
-		Tx:          fakeTx{rels, deps},
-		Git:         g,
-		Deployer:    dep,
-		Target:      "lazyscan",
-		Now:         func() time.Time { return time.Unix(0, 0).UTC() },
-		Out:         buf,
+		Releases:        rels,
+		Deployments:     deps,
+		Tx:              fakeTx{rels, deps},
+		Git:             g,
+		Deployer:        dep,
+		Target:          "lazyscan",
+		StagingCheckout: func() (string, error) { return "staging", nil },
+		Now:             func() time.Time { return time.Unix(0, 0).UTC() },
+		Out:             buf,
 	}
 	return app, rels, deps, buf
 }

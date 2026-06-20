@@ -38,7 +38,7 @@ type App struct {
 	Git             GitReader
 	Deployer        Deployer
 	Target          string
-	StagingCheckout string
+	StagingCheckout func() (string, error) // resolved lazily; only create reads target.env
 	Now             func() time.Time
 	Out             io.Writer
 }
@@ -83,7 +83,11 @@ func (a *App) now() time.Time {
 // Create snapshots the validated staging commit, generates release notes, and
 // records the release at Staging (it is already deployed on staging per PLAN).
 func (a *App) Create(ctx context.Context, version string) error {
-	head, err := a.Git.HeadSHA(ctx, a.StagingCheckout)
+	staging, err := a.StagingCheckout()
+	if err != nil {
+		return err
+	}
+	head, err := a.Git.HeadSHA(ctx, staging)
 	if err != nil {
 		return err
 	}
@@ -93,7 +97,7 @@ func (a *App) Create(ctx context.Context, version string) error {
 	} else if last != nil {
 		prev = last.CommitSHA
 	}
-	subjects, err := a.Git.Subjects(ctx, a.StagingCheckout, prev, head)
+	subjects, err := a.Git.Subjects(ctx, staging, prev, head)
 	if err != nil {
 		return err
 	}

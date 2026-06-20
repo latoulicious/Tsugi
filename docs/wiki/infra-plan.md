@@ -6,7 +6,9 @@ kept verbatim below for history.
 
 Type: Go release-promotion + deployment-orchestration service + CLI.
 
-Status: **P6 scaffold done** — `release` CLI (create/list/show/promote/rollback)
+Status: **P8 scaffold done** — cleanup: lazy staging checkout, `make install`,
+`help` subcommand, `serve` default `127.0.0.1:8090` (2026-06-20). P7 target
+topology correction → live `../LazyScan` (2026-06-20). P6 `release` CLI (create/list/show/promote/rollback)
 + `migrate` runner + git/deploy adapters + `WithTx` (2026-06-19). P5 `deployment`
 entity + `postgres` pgx adapter + migrations (2026-06-19). P4 `changelog`
 conventional-commit generator (2026-06-19). P3 `release` domain entity + state
@@ -142,7 +144,7 @@ separation scaffold (2026-06-19).
   (no live DB/git/docker). The pgx adapter + runner still need a live Postgres —
   validated by compile + `go vet`.
 
-## 2026-06-20 — Phase 8 plan (cleanup) — **planned**
+## 2026-06-20 — Phase 8 plan (cleanup) — **scaffold done** (item 5 deferred)
 
 Follow-ups surfaced while bringing up staging + Tsugi (see `sessions/20-06-2026.md`):
 
@@ -158,6 +160,20 @@ Follow-ups surfaced while bringing up staging + Tsugi (see `sessions/20-06-2026.
   also bind loopback, not all interfaces, since the tunnel fronts it.
 - Reconcile LazyScan `main`'s `docker-compose.yml` with the env-driven compose
   that landed on `development` (harmless drift — prod is skip-worktree).
+
+**Scaffold 2026-06-20 (items 1–4):**
+
+- Item 1: `cli.App.StagingCheckout` is now `func() (string, error)`, resolved
+  lazily in `Create`; `runRelease` no longer reads `target.env` up front, so
+  `list`/`show`/`promote`/`rollback` work without it.
+- Item 2: `make install` extracts the static binary from the image to
+  `/usr/local/bin` (`PREFIX` overridable); runtime model documented in `running.md`.
+- Item 3: `help`/`--help`/`-h` print top-level usage (exit 0); unknown commands
+  print the same usage to stderr (exit 1).
+- Item 4: `serve` default is `127.0.0.1:8090` (loopback, no dozzle clash);
+  `Dockerfile` `EXPOSE`/`HEALTHCHECK` track it.
+- Item 5 (LazyScan `main` compose reconcile) **deferred** — cross-repo, prod
+  compose is skip-worktree (pull-safe); handle in the LazyScan repo separately.
 
 ## 2026-06-20 — Phase 7 (target topology correction) — **done**
 

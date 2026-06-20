@@ -14,7 +14,7 @@ type Config struct {
 }
 
 const (
-	defaultAddr      = ":8080"
+	defaultAddr      = "127.0.0.1:8090" // loopback (tunnel fronts it); :8080 is dozzle on the box
 	defaultTarget    = "lazyscan"
 	defaultDeployDir = "deploy"
 )

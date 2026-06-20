@@ -23,7 +23,10 @@ import (
 	"github.com/latoulicious/Tsugi/internal/version"
 )
 
-const shutdownTimeout = 10 * time.Second
+const (
+	shutdownTimeout = 10 * time.Second
+	usage           = "usage: tsugi <serve|migrate|release|help>"
+)
 
 func main() {
 	args := os.Args[1:]
@@ -39,8 +42,10 @@ func main() {
 		err = runMigrate(args)
 	case "release":
 		err = runRelease(args)
+	case "help", "--help", "-h":
+		fmt.Println(usage)
 	default:
-		err = fmt.Errorf("unknown command %q (serve|migrate|release)", cmd)
+		err = fmt.Errorf("unknown command %q\n%s", cmd, usage)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "tsugi:", err)
@@ -115,19 +120,16 @@ func runRelease(args []string) error {
 		return err
 	}
 	defer pool.Close()
-	staging, err := deploy.StagingCheckout(cfg.DeployDir, cfg.Target)
-	if err != nil {
-		return err
-	}
 	store := postgres.New(pool)
 	app := &cli.App{
-		Releases:        store.Releases,
-		Deployments:     store.Deployments,
-		Tx:              store,
-		Git:             git.Default{},
-		Deployer:        deploy.Script{BinDir: filepath.Join(cfg.DeployDir, "bin")},
-		Target:          cfg.Target,
-		StagingCheckout: staging,
+		Releases:    store.Releases,
+		Deployments: store.Deployments,
+		Tx:          store,
+		Git:         git.Default{},
+		Deployer:    deploy.Script{BinDir: filepath.Join(cfg.DeployDir, "bin")},
+		Target:      cfg.Target,
+		// lazy so read-only commands don't require target.env
+		StagingCheckout: func() (string, error) { return deploy.StagingCheckout(cfg.DeployDir, cfg.Target) },
 		Out:             os.Stdout,
 	}
 	return app.Run(ctx, args)
