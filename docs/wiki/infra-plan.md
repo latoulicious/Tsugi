@@ -152,6 +152,10 @@ Follow-ups surfaced while bringing up staging + Tsugi (see `sessions/20-06-2026.
   needs host git/docker/checkouts). The `serve` image is build+migrate only —
   document this and add a Makefile target to extract/install the binary.
 - Add a `help` / `--help` subcommand (currently errors).
+- `tsugi serve` defaults to `:8080`, which collides with dozzle
+  (`127.0.0.1:8080`) on the box — `serve: listen tcp :8080: bind: address already
+  in use`. Pick a non-conflicting default (e.g. `:8090`) or require `TSUGI_ADDR`;
+  also bind loopback, not all interfaces, since the tunnel fronts it.
 - Reconcile LazyScan `main`'s `docker-compose.yml` with the env-driven compose
   that landed on `development` (harmless drift — prod is skip-worktree).
 
