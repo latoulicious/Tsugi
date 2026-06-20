@@ -142,6 +142,55 @@ separation scaffold (2026-06-19).
   (no live DB/git/docker). The pgx adapter + runner still need a live Postgres —
   validated by compile + `go vet`.
 
+## 2026-06-20 — Phase 7 (target topology correction) — **repo sweep done, VPS pending**
+
+Cleanup/refactor phase. Not in the original PLAN — added because the P1 deploy
+scaffold and parts of the wiki were authored against the **wrong target**.
+
+- **Root cause (negligence):** P1 modeled the deploy layer on the legacy
+  `../LazyScan-Stack` (detached services: `aegis` edge, `minio`, separate
+  `s3.<domain>` hosts, `docker-compose.prod.yml`). The live target is the trimmed
+  monorepo `../LazyScan`: a single nginx `web` service (SPA + `/api` proxy) on
+  `127.0.0.1:8080:80`, internal `api`/`image-svc`/`mail-svc`/`postgres`/`redis`,
+  storage on **R2** (presigned PUT browser→R2, not through Tsugi's tunnel), one
+  `docker-compose.yml`. The Go service/CLI/postgres code is target-agnostic and is
+  **not** affected — this is config + docs only.
+- **Corrected topology (from live VPS, 2026-06-20):** one tunnel hostname per env,
+  one nginx `web` edge per stack, no s3 host, no minio.
+  - prod: `lazyscan.my.id` → `127.0.0.1:8081` — **already live** (`lazyscan-web-1`,
+    compose project `lazyscan`). Untouched by P7.
+  - staging: `staging.lazyscan.my.id` → `127.0.0.1:8082` — **new** (compose project
+    `lazyscan-staging`). 8080 is taken by `dozzle`, so staging takes 8082.
+  - App lives in its own zone `lazyscan.my.id`; infra hosts are under
+    `*.sanctuary.my.id`. Tunnel `vps` (`e7f99e75-…`), config
+    `/etc/cloudflared/config.yml`.
+- **Compose project alignment:** the live prod stack runs as bare project
+  `lazyscan` (started with `docker compose up` in `../LazyScan`). `deploy.sh`
+  currently names projects `<target>-<env>` → it would spawn a *duplicate*
+  `lazyscan-prod`. Fix: prod uses the bare target name (`lazyscan`), staging uses
+  `<target>-staging` (`lazyscan-staging`).
+- **Scope (config + docs):**
+  - `deploy/bin/deploy.sh` — project name: prod = `<target>`, staging =
+    `<target>-staging` (was `<target>-<env>`).
+  - `deploy/targets/lazyscan/target.env` — `BASE_COMPOSE=docker-compose.yml`,
+    checkout paths point at `../LazyScan` clones (real prod-checkout path TBD —
+    confirm on VPS).
+  - `docker-compose.{prod,staging}.override.yml` — service `web`, port `:80`
+    (`8081:80` / `8082:80`), drop the `minio` block.
+  - `cloudflared/config.yml.example` — prod `lazyscan.my.id`→8081, staging
+    `staging.lazyscan.my.id`→8082; drop both `s3` rules and the `aegis` framing.
+  - `.env.{prod,staging}.example` — `PUBLIC_APP_URL` = `https://lazyscan.my.id` /
+    `https://staging.lazyscan.my.id`; drop `PUBLIC_S3_URL`.
+  - `docs/wiki/{architecture,running,known-constraints,infra-plan}.md` — topology,
+    port map (8081/8082), hosts, packages note (`aegis`→`web`), drop minio/s3.
+- **VPS action (not in-repo):** append one ingress rule
+  (`staging.lazyscan.my.id` → `127.0.0.1:8082`) above the `404` catch-all in
+  `/etc/cloudflared/config.yml`, then `cloudflared tunnel route dns vps
+  staging.lazyscan.my.id`. Prod rule untouched.
+- **Success criteria:** deploy scaffold + wiki match the live `../LazyScan`
+  topology exactly; `deploy.sh --env prod` targets the existing `lazyscan` project
+  (no duplicate); staging reachable at `staging.lazyscan.my.id`.
+
 Original plan below kept as-is for history.
 
 ---

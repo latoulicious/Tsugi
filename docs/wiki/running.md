@@ -49,7 +49,7 @@ Rollback redeploys a specific commit via `deploy.sh --ref <sha>`.
 `deploy.sh` is still callable directly (and is what the CLI shells out to):
 
 ```sh
-deploy/bin/deploy.sh --target lazyscan --env staging   # dev → staging stack
+deploy/bin/deploy.sh --target lazyscan --env staging   # development → staging stack
 deploy/bin/deploy.sh --target lazyscan --env prod      # main → production stack
 deploy/bin/deploy.sh --target lazyscan --env prod --ref <sha>  # rollback a commit
 deploy/bin/deploy.sh --help
@@ -57,11 +57,12 @@ deploy/bin/deploy.sh --help
 
 What it does, per env:
 
-1. resolve branch (`prod`→`main`, `staging`→`dev`) and project
-   (`<target>-<env>`).
+1. resolve branch (`prod`→`main`, `staging`→`development`) and project
+   (prod = `lazyscan`, staging = `lazyscan-staging`).
 2. `cd` the env checkout, `git fetch` + `checkout` + `pull --ff-only` the branch.
-3. `docker compose -p <project> -f <base> -f <override> --env-file <env-file>
-   up -d --build --remove-orphans`.
+3. `docker compose -p <project> --project-directory <checkout> -f <base>
+   -f <override> up -d --build --remove-orphans` — interpolation from the
+   checkout's own `.env`.
 
 ## Per-target config
 
@@ -69,58 +70,58 @@ What it does, per env:
 
 | Variable | Meaning |
 |---|---|
-| `BASE_COMPOSE` | base compose path **relative to the checkout** (default `docker-compose.prod.yml`) |
+| `BASE_COMPOSE` | base compose path **relative to the checkout** (default `docker-compose.yml`) |
 | `CHECKOUT_PROD` | VPS path of the `main` checkout (e.g. `/opt/lazyscan-prod`) |
-| `CHECKOUT_STAGING` | VPS path of the `dev` checkout (e.g. `/opt/lazyscan-staging`) |
+| `CHECKOUT_STAGING` | VPS path of the `development` checkout (e.g. `/opt/lazyscan-staging`) |
 
 ## Environment files
 
-Copy the templates and fill real values (git-ignored):
-
-```sh
-cp deploy/targets/lazyscan/.env.prod.example    deploy/targets/lazyscan/.env.prod
-cp deploy/targets/lazyscan/.env.staging.example deploy/targets/lazyscan/.env.staging
-```
-
-These hold compose interpolation vars only (domains, infra creds). The target
-api's own secrets stay in `LazyScan/api/.env` — do not duplicate them here.
+Tsugi does not template env-files. Each checkout supplies its own `.env` in the
+checkout root (git-ignored); `docker-compose.yml` interpolates it via
+`--project-directory`. The prod checkout holds prod's `.env`, the staging
+checkout holds staging's (own domain, own R2 creds) — single source of truth, no
+duplication in this repo. See `../LazyScan/.env.example` for the full variable set
+(`JWT_SECRET`, `STORAGE_*` R2, `SMTP_*`, `DEFAULT_SUPERUSER_*`, …).
 
 ## Port map
 
 | Service | Production | Staging |
 |---|---|---|
-| app edge | `127.0.0.1:8080` | `127.0.0.1:8081` |
-| minio S3 API | `127.0.0.1:9000` | `127.0.0.1:9100` |
-| minio console | `127.0.0.1:9001` | `127.0.0.1:9101` |
+| web (nginx edge) | `127.0.0.1:8081` | `127.0.0.1:8082` |
+
+No minio — uploads go to R2. On the box, `8080` is taken by dozzle and `8081` by
+the live prod stack, so staging publishes on `8082`.
 
 ## Cloudflare Tunnel
 
-Copy `deploy/targets/lazyscan/cloudflared/config.yml.example` to `config.yml`,
-fill the tunnel id/domain, then route the hostnames:
+The VPS runs one shared tunnel (`vps`). Add the app hostnames to its ingress
+(`/etc/cloudflared/config.yml`, see the example) above the `404` catch-all, then
+route DNS:
 
 ```sh
-cloudflared tunnel route dns <tunnel> api.<domain>
-cloudflared tunnel route dns <tunnel> staging-api.<domain>
-cloudflared tunnel route dns <tunnel> s3.<domain>
-cloudflared tunnel route dns <tunnel> staging-s3.<domain>
-cloudflared tunnel run <tunnel>
+cloudflared tunnel route dns vps lazyscan.my.id
+cloudflared tunnel route dns vps staging.lazyscan.my.id
 ```
 
 ## First checkout on the VPS
 
 ```sh
-git clone <lazyscan-stack-repo> /opt/lazyscan-prod    && git -C /opt/lazyscan-prod    checkout main
-git clone <lazyscan-stack-repo> /opt/lazyscan-staging && git -C /opt/lazyscan-staging checkout dev
+git clone <lazyscan-repo> /opt/lazyscan-prod    && git -C /opt/lazyscan-prod    checkout main
+git clone <lazyscan-repo> /opt/lazyscan-staging && git -C /opt/lazyscan-staging checkout development
 ```
+
+Each checkout then needs its own `.env` (copy from the repo's `.env.example`, fill
+prod/staging values) — compose reads it for interpolation.
 
 ## Local validation (no VPS, no deploy)
 
 ```sh
-# Merge + port check (prod 8080, staging 8081):
-docker compose -p lazyscan-prod \
-  -f ../LazyScan-Stack/docker-compose.prod.yml \
+# Merge + port check (prod 8081, staging 8082); needs ../LazyScan/.env present:
+docker compose -p lazyscan \
+  --project-directory ../LazyScan \
+  -f ../LazyScan/docker-compose.yml \
   -f deploy/targets/lazyscan/docker-compose.prod.override.yml \
-  --env-file deploy/targets/lazyscan/.env.prod.example config | grep -A2 published
+  config | grep -A2 published
 
 cloudflared tunnel ingress validate deploy/targets/lazyscan/cloudflared/config.yml.example
 bash -n deploy/bin/deploy.sh
@@ -128,8 +129,8 @@ bash -n deploy/bin/deploy.sh
 
 ## Acceptance (Phase 1 success criterion)
 
-- [ ] `docker compose -p lazyscan-prod ... config` → app edge on `:8080`.
-- [ ] `docker compose -p lazyscan-staging ... config` → app edge on `:8081`.
-- [ ] `api.<domain>` serves production (built from `main`).
-- [ ] `staging-api.<domain>` serves staging (built from `dev`).
-- [ ] **Production is no longer running `dev`.**
+- [ ] `docker compose -p lazyscan ... config` → web edge on `:8081`.
+- [ ] `docker compose -p lazyscan-staging ... config` → web edge on `:8082`.
+- [ ] `lazyscan.my.id` serves production (built from `main`).
+- [ ] `staging.lazyscan.my.id` serves staging (built from `development`).
+- [ ] **Production is no longer running `development`.**

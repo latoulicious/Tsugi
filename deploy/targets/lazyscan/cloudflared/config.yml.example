@@ -1,15 +1,12 @@
 # Tsugi env-separation tunnel ingress: prod + staging on one VPS.
-# api -> aegis edge; s3 -> minio (presigned PUT binds SigV4 to the S3 host).
+# One nginx `web` edge per stack (serves SPA + proxies /api, same origin).
+# Uploads go browser -> R2 directly, so there is no s3 hostname here.
 tunnel: <TUNNEL_ID>
 credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
 
 ingress:
-  - hostname: api.example.com
-    service: http://127.0.0.1:8080
-  - hostname: s3.example.com
-    service: http://127.0.0.1:9000
-  - hostname: staging-api.example.com
+  - hostname: lazyscan.my.id
     service: http://127.0.0.1:8081
-  - hostname: staging-s3.example.com
-    service: http://127.0.0.1:9100
+  - hostname: staging.lazyscan.my.id
+    service: http://127.0.0.1:8082
   - service: http_status:404

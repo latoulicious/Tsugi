@@ -1,10 +1,7 @@
-# Tsugi production port pin for the lazyscan stack (canonical ports, explicit).
+# Tsugi production port pin for the lazyscan stack (explicit, canonical).
 # !override replaces the base port list instead of appending it (compose >=2.24.4).
+# web is the nginx edge (SPA + /api); it listens on :80 in-container.
 services:
-  aegis:
+  web:
     ports: !override
-      - "127.0.0.1:8080:8080"
-  minio:
-    ports: !override
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
+      - "127.0.0.1:8081:80"

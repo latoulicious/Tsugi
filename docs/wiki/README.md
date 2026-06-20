@@ -18,8 +18,8 @@ Project memory for Tsugi — release promotion and deployment orchestration
 ## Related
 
 - `../../../LazyScan/docs/wiki/` — docs/commit/comment convention source.
-- `../../../LazyScan-Stack/docker-compose.prod.yml` — first deploy target's
-  compose (orchestrated, not forked).
+- `../../../LazyScan/docker-compose.yml` — first deploy target's compose
+  (orchestrated, not forked).
 
 > Doc rule: code is source of truth; note drift, keep notes concise, append
 > session history — never overwrite it.

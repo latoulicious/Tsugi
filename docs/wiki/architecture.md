@@ -12,19 +12,18 @@ first target is LazyScan. Phases 2–6 add a Go service (`GET /version`) and a
 
 ```txt
 Cloudflare Tunnel
-  api.<domain>         -> 127.0.0.1:8080  production stack (branch main)
-  s3.<domain>          -> 127.0.0.1:9000  production minio (presigned PUT)
-  staging-api.<domain> -> 127.0.0.1:8081  staging stack    (branch dev)
-  staging-s3.<domain>  -> 127.0.0.1:9100  staging minio
+  lazyscan.my.id          -> 127.0.0.1:8081  production stack (branch main)
+  staging.lazyscan.my.id  -> 127.0.0.1:8082  staging stack    (branch development)
 
-production  = docker compose -p <target>-prod    (checkout @ main)
-staging     = docker compose -p <target>-staging (checkout @ dev)
+production  = docker compose -p lazyscan         (checkout @ main)
+staging     = docker compose -p lazyscan-staging (checkout @ development)
 ```
 
-Two isolated compose project stacks, distinguished by project name, published
-port offset, env-file, and checked-out branch. Isolation is total (each stack
-has its own postgres/redis/minio) — see the memory note in
-`known-constraints.md`.
+One nginx `web` edge per stack (serves the SPA and proxies `/api`, same origin).
+Uploads go browser → R2 directly, so there is no s3 hostname. Two isolated
+compose project stacks, distinguished by project name, published port offset,
+the checkout's own `.env`, and checked-out branch. Each stack runs its own
+postgres/redis — see the memory note in `known-constraints.md`.
 
 ## Deploy Mechanism (Phase 1)
 
@@ -32,10 +31,11 @@ Tsugi adds four per-environment levers on top of the target's base compose:
 
 | Lever | Production | Staging |
 |---|---|---|
-| compose project (`-p`) | `lazyscan-prod` | `lazyscan-staging` |
+| compose project (`-p`) | `lazyscan` | `lazyscan-staging` |
 | override file | `docker-compose.prod.override.yml` | `docker-compose.staging.override.yml` |
-| env-file | `.env.prod` | `.env.staging` |
-| checkout branch | `main` | `dev` |
+| published port | `127.0.0.1:8081` | `127.0.0.1:8082` |
+| interpolation | checkout's `.env` | checkout's `.env` |
+| checkout branch | `main` | `development` |
 
 Override files only carry the port deltas (via the `!override` YAML tag, which
 replaces the base list instead of appending). Everything else comes from the
@@ -61,7 +61,7 @@ internal/deploy    P6 adapter shelling out to deploy/bin/deploy.sh
 internal/cli       P6 release CLI use-cases (create/list/show/promote/rollback)
 ```
 
-Flat layout, parity with the LazyScan-Stack Go services. Domain packages
+Flat layout, parity with the sibling LazyScan Go services. Domain packages
 (`release`, `deployment`) each define a `Repository` port; `postgres`/`git`/
 `deploy` are the infrastructure adapters; `cli` is the application layer (the
 use-cases). Kept as flat peers, not a `domain/application/infrastructure`
@@ -78,11 +78,12 @@ subtree — matching the rest of the stack. P5 is the first external dependency
 | P4 | Changelog generation from `git log` (conventional commits, no AI) | **done** — scaffold 2026-06-19 |
 | P5 | Deployment tracking: `releases` + `deployments` tables | **done** — scaffold 2026-06-19 |
 | P6 | Promotion & rollback: `release` CLI (create/list/show/promote/rollback) | **done** — scaffold 2026-06-19 |
+| P7 | Target topology correction: re-point deploy scaffold + wiki from legacy `LazyScan-Stack` to the live `../LazyScan` monorepo | **in progress** — repo sweep 2026-06-20; VPS staging stand-up pending |
 
 ## Current Behavior (P1 scaffold)
 
 No running service. The repo carries the deploy layer and project memory only.
 `deploy/bin/deploy.sh --target lazyscan --env <prod|staging>` resolves the
-branch, project, override, and env-file, then runs `docker compose ... up -d`
-against the target checkout. The Go `release` CLI (Phase 6) supersedes this
+branch, project, and port override, then runs `docker compose ... up -d`
+against the target checkout (interpolation from the checkout's own `.env`). The Go `release` CLI (Phase 6) supersedes this
 script. Nothing here touches a live VPS — operators run it on the box.
