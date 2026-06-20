@@ -1,11 +1,12 @@
 FROM golang:1.26-alpine AS build
 WORKDIR /src
 
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 COPY cmd ./cmd
 COPY internal ./internal
+COPY migrations ./migrations
 
 # Build identity injected at link time; defaults match the version package.
 ARG VERSION=dev
