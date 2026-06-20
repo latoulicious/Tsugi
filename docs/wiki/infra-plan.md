@@ -142,7 +142,20 @@ separation scaffold (2026-06-19).
   (no live DB/git/docker). The pgx adapter + runner still need a live Postgres —
   validated by compile + `go vet`.
 
-## 2026-06-20 — Phase 7 (target topology correction) — **repo sweep done, VPS pending**
+## 2026-06-20 — Phase 8 plan (cleanup) — **planned**
+
+Follow-ups surfaced while bringing up staging + Tsugi (see `sessions/20-06-2026.md`):
+
+- `release list`/`show` are pure DB reads but still load the deploy target config
+  (`target.env`); decouple so read-only commands don't require it.
+- Tsugi's runtime is the host static binary (the CLI shells to `deploy.sh` and
+  needs host git/docker/checkouts). The `serve` image is build+migrate only —
+  document this and add a Makefile target to extract/install the binary.
+- Add a `help` / `--help` subcommand (currently errors).
+- Reconcile LazyScan `main`'s `docker-compose.yml` with the env-driven compose
+  that landed on `development` (harmless drift — prod is skip-worktree).
+
+## 2026-06-20 — Phase 7 (target topology correction) — **done**
 
 Cleanup/refactor phase. Not in the original PLAN — added because the P1 deploy
 scaffold and parts of the wiki were authored against the **wrong target**.

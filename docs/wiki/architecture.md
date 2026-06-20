@@ -78,7 +78,8 @@ subtree — matching the rest of the stack. P5 is the first external dependency
 | P4 | Changelog generation from `git log` (conventional commits, no AI) | **done** — scaffold 2026-06-19 |
 | P5 | Deployment tracking: `releases` + `deployments` tables | **done** — scaffold 2026-06-19 |
 | P6 | Promotion & rollback: `release` CLI (create/list/show/promote/rollback) | **done** — scaffold 2026-06-19 |
-| P7 | Target topology correction: re-point deploy scaffold + wiki from legacy `LazyScan-Stack` to the live `../LazyScan` monorepo | **in progress** — repo sweep 2026-06-20; VPS staging stand-up pending |
+| P7 | Target topology correction: re-point deploy scaffold + wiki from legacy `LazyScan-Stack` to the live `../LazyScan` monorepo | **done** — 2026-06-20 (staging live, Tsugi deployed) |
+| P8 | Cleanup: decouple read-only CLI from target config, host-binary runtime, `help` subcommand | **planned** — 2026-06-20 |
 
 ## Current Behavior (P1 scaffold)
 
