@@ -1,7 +1,8 @@
 # Tsugi staging port shift for the lazyscan stack (avoid prod clash on one VPS).
 # !override replaces the base port list instead of appending it (compose >=2.24.4).
-# 8080 is taken by dozzle, prod holds 8081, so staging publishes on 8082.
+# prod web holds 8080, so staging publishes on 8090.
+# Matches the live tunnel: staging.lazyscan.my.id -> 127.0.0.1:8090.
 services:
   web:
     ports: !override
-      - "127.0.0.1:8082:80"
+      - "127.0.0.1:8090:80"
