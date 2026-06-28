@@ -76,3 +76,26 @@ Format per finding:
   `releaseID`. Both come from the DB row, so it is a defensive guard, not a
   user-facing path.
 - status: resolved (→ R-004)
+
+## F-007 Wiki port docs stale after align-to-live (8081/8082 → 8080/8090)
+- date: 2026-06-28
+- source: manual (deploy topology reconciliation session)
+- severity: low
+- location: docs/wiki/{architecture,running,known-constraints,infra-plan}.md
+- problem: canonical port scheme was realigned to the live tunnel — prod web
+  8080, staging web 8090 (prod/staging overrides + cloudflared example updated in
+  c8b84f2). The current-state wiki tables still cite the old 8081/8082. Dated
+  session logs (19/20-06) left as history, not edited.
+- status: open
+
+## F-008 Port 8090 double-booked: staging `web` vs `tsugi serve`
+- date: 2026-06-28
+- source: manual
+- severity: medium
+- location: deploy/targets/lazyscan/docker-compose.staging.override.yml; serve default port
+- problem: staging LazyScan `web` now publishes `127.0.0.1:8090` to match the
+  cloudflared staging ingress. The journal reserves 8090 for `tsugi serve`. No
+  live clash today (serve not running), but running serve while staging is up
+  collides. Pick a distinct serve port (or move staging) before running serve on
+  the box.
+- status: open
