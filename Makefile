@@ -14,7 +14,15 @@ LDFLAGS := -s -w \
 	-X $(PKG)/internal/version.Commit=$(COMMIT) \
 	-X $(PKG)/internal/version.Date=$(DATE)
 
-.PHONY: build run test vet tidy image install
+.PHONY: build run test vet tidy proto image install
+
+# Regenerate the gRPC stubs from the vendored contract (source of truth: Yagura).
+# Needs protoc + protoc-gen-go + protoc-gen-go-grpc on PATH. Generated *.pb.go are
+# committed so the Docker build stays protoc-free.
+proto:
+	protoc --go_out=. --go_opt=module=$(PKG) \
+		--go-grpc_out=. --go-grpc_opt=module=$(PKG) \
+		proto/tsugi_agent.proto
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) $(CMD)
