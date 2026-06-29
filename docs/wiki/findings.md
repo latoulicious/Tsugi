@@ -99,3 +99,64 @@ Format per finding:
   collides. Pick a distinct serve port (or move staging) before running serve on
   the box.
 - status: open
+
+## F-009 gRPC GracefulStop has no shutdown deadline
+- date: 2026-06-29
+- source: coderabbit (P5.2 review)
+- severity: medium
+- location: cmd/tsugi/main.go:115-118
+- problem: `run()` calls `grpcSrv.GracefulStop()` with no bound; a slow or hung
+  RPC blocks shutdown indefinitely, and the existing `shutdownTimeout` only
+  covers `httpSrv.Shutdown`. Should bound GracefulStop by `shutdownCtx` and fall
+  back to `grpcSrv.Stop()` so HTTP shutdown + process exit still complete.
+- status: resolved (→ R-005)
+
+## F-010 HTTP `TSUGI_ADDR` not loopback-guarded like the agent
+- date: 2026-06-29
+- source: coderabbit (P5.2 review)
+- severity: low
+- location: internal/config/config.go:23-31
+- problem: only `AgentAddr` is loopback-validated; `TSUGI_ADDR` may bind a public
+  interface. Assessment: **by design** — the HTTP `/version`+`/healthz` plane is
+  meant to be fronted by the Cloudflare tunnel (known-constraints); only the
+  write-plane agent must stay off-box. Forcing loopback on `TSUGI_ADDR` would
+  break the documented topology and remove a legitimate override. Recommend
+  won't-fix; documenting the rationale here.
+- status: wontfix (by design — HTTP plane is tunnel-fronted)
+
+## F-011 `requireLoopback` trusts the literal host `localhost`
+- date: 2026-06-29
+- source: coderabbit (P5.2 review)
+- severity: medium
+- location: internal/config/config.go:41-52
+- problem: special-casing the string `localhost` relies on name resolution; a
+  misconfigured/hostile `/etc/hosts` could map it off-loopback and defeat the
+  write-plane guarantee. Tightening to literal loopback IPs only
+  (`net.ParseIP(host).IsLoopback()`) removes the DNS vector and is less code.
+- status: resolved (→ R-006)
+
+## F-012 `requireLoopback` does not validate the port range
+- date: 2026-06-29
+- source: coderabbit (P5.2 review)
+- severity: low
+- location: internal/config/config.go:43-46
+- problem: `net.SplitHostPort` accepts an out-of-range/non-numeric port; a bad
+  value is caught at `net.Listen` (startup) rather than at config load.
+  Assessment: `net.Listen` already fails fast with a clear error, and the
+  existing `TSUGI_ADDR` validation is equally lenient — low value. Recommend
+  defer (YAGNI) unless symmetric strict parsing is wanted.
+- status: deferred (net.Listen fail-fasts; revisit with symmetric Addr parsing)
+
+## F-013 read RPCs query releases + deployments non-atomically
+- date: 2026-06-29
+- source: coderabbit (P5.2 review)
+- severity: low
+- location: internal/agent/server.go:47-90
+- problem: `ListReleases`/`ListDeployments` issue two independent `List()` reads,
+  not one snapshot; a write landing between them can skew the denormalized view
+  (e.g. a deployment whose release post-dates the releases read → empty commit).
+  The `deployments.release_id` FK rules out a true orphan, so the only cause is
+  read-skew, and it self-heals on the next poll of this read-only overview.
+  Options: a consistent read-tx snapshot (REPEATABLE READ) vs accept + document
+  for a polling read plane.
+- status: accepted (read-skew self-heals; FK prevents true orphans)

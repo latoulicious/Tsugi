@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,7 +14,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
+	"github.com/latoulicious/Tsugi/internal/agent"
+	"github.com/latoulicious/Tsugi/internal/agentpb"
 	"github.com/latoulicious/Tsugi/internal/cli"
 	"github.com/latoulicious/Tsugi/internal/config"
 	"github.com/latoulicious/Tsugi/internal/deploy"
@@ -58,20 +63,44 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	if cfg.DatabaseURL == "" {
+		return errors.New("TSUGI_DATABASE_URL is required for serve (hosts the read-plane agent)")
+	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	srv := server.New(cfg, logger)
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	errCh := make(chan error, 1)
+	pool, err := postgres.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	store := postgres.New(pool)
+
+	httpSrv := server.New(cfg, logger)
+
+	grpcSrv := grpc.NewServer()
+	agentpb.RegisterTsugiAgentServer(grpcSrv, agent.New(store.Releases, store.Deployments, cfg.Target))
+	reflection.Register(grpcSrv) // loopback only — lets grpcurl introspect the agent
+	lis, err := net.Listen("tcp", cfg.AgentAddr)
+	if err != nil {
+		return fmt.Errorf("listen agent %s: %w", cfg.AgentAddr, err)
+	}
+
+	errCh := make(chan error, 2)
 	go func() {
 		v := version.Get()
 		logger.Info("tsugi listening", "addr", cfg.Addr, "version", v.Version, "commit", v.Commit)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+	go func() {
+		logger.Info("tsugi agent listening", "addr", cfg.AgentAddr)
+		if err := grpcSrv.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			errCh <- err
 		}
 	}()
@@ -85,11 +114,27 @@ func run() error {
 	logger.Info("shutting down", "timeout", shutdownTimeout)
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
+	stopGRPC(shutdownCtx, grpcSrv)
+	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown: %w", err)
 	}
 	logger.Info("shutdown complete")
 	return nil
+}
+
+// stopGRPC drains the gRPC server within ctx, forcing Stop() if the graceful
+// drain outlasts the deadline so shutdown can't hang on a slow RPC.
+func stopGRPC(ctx context.Context, srv *grpc.Server) {
+	done := make(chan struct{})
+	go func() {
+		srv.GracefulStop()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		srv.Stop()
+	}
 }
 
 func runMigrate(args []string) error {

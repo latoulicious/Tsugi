@@ -37,6 +37,11 @@ staging takes `8082`.
 `tsugi serve` defaults to `127.0.0.1:8090` (loopback; the tunnel fronts it) to
 avoid the `8080` dozzle clash. Override with `TSUGI_ADDR`.
 
+The write-plane gRPC **agent** binds `127.0.0.1:8091` (`TSUGI_AGENT_ADDR`),
+**loopback only and never tunneled** — config refuses a non-loopback bind. Unlike
+the HTTP port the tunnel must not front it; Yagura's read plane dials it over
+localhost only (Yagura PLAN §11).
+
 ## Routing — Cloudflare Tunnel
 
 - Two app hostnames on the shared `vps` tunnel: `lazyscan.my.id` → 8081,
@@ -64,8 +69,9 @@ avoid the `8080` dozzle clash. Override with `TSUGI_ADDR`.
   Tsugi keeps a single unified history — the `deployments.environment` column
   (`staging`/`production`) is the only distinction. Deployment history must be
   queryable across both envs, so it cannot be split per stack.
-- Connection via `TSUGI_DATABASE_URL` (P6: required by `tsugi migrate`/`release`,
-  not by `serve`). Migrations in `migrations/` are embedded and applied with
+- Connection via `TSUGI_DATABASE_URL`, required by `tsugi migrate`/`release` and
+  — since P5.2 — by `serve` too (it hosts the read-plane agent and fails fast
+  without it). Migrations in `migrations/` are embedded and applied with
   `tsugi migrate up` (tracked in `schema_migrations`); the runner is minimal — no
   dirty-state recovery, no down-to-version. `down` rolls back the last step only.
 

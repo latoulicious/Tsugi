@@ -56,3 +56,27 @@ Format per resolution:
   zero-`releaseID` case alongside the zero-`id` case); `gofmt` clean.
 - constraints honored: smallest safe change; `New` path untouched; no public
   behavior change beyond the more precise error; no unrelated cleanup.
+
+## R-005 Bound gRPC shutdown by the deadline  (resolves F-009)
+- date: 2026-06-29
+- change: Added `stopGRPC(ctx, srv)` — runs `GracefulStop` in a goroutine and
+  falls back to `Stop()` when `shutdownCtx` (the existing `shutdownTimeout`)
+  expires, so a slow RPC can't stall HTTP shutdown or process exit.
+- files: cmd/tsugi/main.go
+- verification: `go build`/`vet` clean; `gofmt` clean; SIGTERM still logs
+  "shutdown complete" (graceful path, reads drain instantly).
+- constraints honored: smallest safe change; reuses existing `shutdownTimeout`;
+  no contract change; serve behavior otherwise untouched.
+
+## R-006 Loopback IPs only, drop `localhost`  (resolves F-011)
+- date: 2026-06-29
+- change: `requireLoopback` now accepts only a literal loopback IP
+  (`net.ParseIP(host).IsLoopback()`) — dropped the `localhost` string branch so
+  the write-plane guard no longer depends on name resolution. Error message now
+  reads "127.0.0.1 or ::1".
+- files: internal/config/config.go
+- verification: `go build`/`vet`/`test ./internal/agent` green; `gofmt` clean;
+  `TSUGI_AGENT_ADDR=localhost:8091` now rejected at config load, `127.0.0.1`/`::1`
+  pass; `0.0.0.0` still rejected.
+- constraints honored: tightens a security boundary with less code; no public
+  contract change; default `127.0.0.1:8091` unaffected.

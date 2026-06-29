@@ -23,11 +23,29 @@ curl -s 127.0.0.1:8090/healthz # {"status":"ok","service":"tsugi"}
 own compose / VPS deploy wiring is not yet built (P5/P6). Package docs:
 `docs/module/`.
 
+## Write-plane agent (Yagura P5.2)
+
+`serve` also hosts the gRPC agent on `TSUGI_AGENT_ADDR` (default
+`127.0.0.1:8091`, loopback only — never tunnel it). It reads the
+`releases`/`deployments` tables, so `serve` now **requires** `TSUGI_DATABASE_URL`
+(it fails fast without it). Yagura's read plane dials it over localhost.
+
+```sh
+export TSUGI_DATABASE_URL="postgres://tsugi:...@127.0.0.1:5432/tsugi"
+tsugi serve                                  # HTTP on :8090 + gRPC agent on :8091
+
+grpcurl -plaintext 127.0.0.1:8091 list                       # needs grpcurl on the box
+grpcurl -plaintext 127.0.0.1:8091 tsugi.agent.v1.TsugiAgent/ListReleases
+```
+
+`ListReleases`/`ListDeployments` are live; `Deploy`/`Rollback`/`Promote` return
+`Unimplemented` until P5.4.
+
 ## Release CLI (Phase 6)
 
-The `tsugi` binary drives releases against the `tsugi` Postgres database. All
-CLI paths need `TSUGI_DATABASE_URL` (`serve` does not). `TSUGI_TARGET` defaults
-to `lazyscan`; `TSUGI_DEPLOY_DIR` to `deploy`.
+The `tsugi` binary drives releases against the `tsugi` Postgres database. The CLI
+paths and `serve` (since P5.2 it hosts the agent) all need `TSUGI_DATABASE_URL`.
+`TSUGI_TARGET` defaults to `lazyscan`; `TSUGI_DEPLOY_DIR` to `deploy`.
 
 Runtime is the host static binary (it shells `deploy.sh`, needs host
 git/docker/checkouts); the image is build+migrate only — install via `make install`.

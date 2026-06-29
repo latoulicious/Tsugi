@@ -224,6 +224,23 @@ scaffold and parts of the wiki were authored against the **wrong target**.
   topology exactly; `deploy.sh --env prod` targets the existing `lazyscan` project
   (no duplicate); staging reachable at `staging.lazyscan.my.id`.
 
+## 2026-06-29 — Yagura P5.2 (write-plane gRPC agent) — **done**
+
+Cross-repo slice (Yagura PLAN §11/§13). Yagura is the read plane (Rust/tonic
+client); Tsugi hosts the write-plane agent. P5.1 landed the contract + stubs;
+P5.2 serves the read RPCs.
+
+- `tsugi serve` now also runs the gRPC agent on `127.0.0.1:8091`
+  (`TSUGI_AGENT_ADDR`), **loopback only — never tunneled** (config rejects a
+  non-loopback bind). Reflection on for `grpcurl`.
+- `ListReleases`/`ListDeployments` implemented over the existing
+  `releases`/`deployments` repos (in-Go join, no new SQL/migration).
+  `Deploy`/`Rollback`/`Promote` stay `Unimplemented` (P5.4).
+- **Behavior change:** `serve` now requires `TSUGI_DATABASE_URL` (it reads the
+  tables) and fails fast without it.
+- Deployment rows are already recorded on the promote/rollback path
+  (`internal/cli` since the P5 tracking slice) — no change needed there.
+
 Original plan below kept as-is for history.
 
 ---
