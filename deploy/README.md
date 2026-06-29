@@ -5,6 +5,7 @@ does not fork it.
 
 ```txt
 bin/deploy.sh          interim deployer (Phase 1); replaced by the Go release CLI (Phase 6)
+tsugi.service.example  host systemd unit for the long-running `tsugi serve`
 targets/<name>/        per-target, per-environment deploy config
   target.env           BASE_COMPOSE + per-env checkout paths (sourced by deploy.sh)
   docker-compose.<env>.override.yml   per-env port deltas (via the !override tag)

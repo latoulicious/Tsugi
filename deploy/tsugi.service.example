@@ -1,0 +1,23 @@
+# deploy/tsugi.service.example — host systemd unit for `tsugi serve`.
+# HTTP :8090 (tunnel-fronted) + gRPC agent :8091 (loopback only — never tunnel it).
+# Setup: write /etc/tsugi/tsugi.env (0600), `make install` the binary, copy this to
+# /etc/systemd/system/tsugi.service, then `systemctl enable --now tsugi`.
+[Unit]
+Description=Tsugi release agent (serve)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# TSUGI_DATABASE_URL (required) + TSUGI_TARGET / TSUGI_DEPLOY_DIR.
+EnvironmentFile=/etc/tsugi/tsugi.env
+# Dedicated account; P5.4 deploy RPCs will need it in the docker group.
+User=tsugi
+Group=tsugi
+# deploy/ (bin/deploy.sh + targets/) lives here; default TSUGI_DEPLOY_DIR is relative.
+WorkingDirectory=/opt/tsugi
+ExecStart=/usr/local/bin/tsugi serve
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

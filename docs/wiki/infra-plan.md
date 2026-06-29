@@ -241,6 +241,12 @@ P5.2 serves the read RPCs.
 - Deployment rows are already recorded on the promote/rollback path
   (`internal/cli` since the P5 tracking slice) — no change needed there.
 
+## 2026-06-30 — P5.2 exit closed (host systemd) — **done**
+
+Added `deploy/tsugi.service.example` (host unit for `tsugi serve`); meets the
+"runs as host systemd, unreachable via tunnel" half of the P5.2 exit. No code
+change. `systemctl enable` itself is a VPS action (out of repo).
+
 Original plan below kept as-is for history.
 
 ---

@@ -41,6 +41,11 @@ grpcurl -plaintext 127.0.0.1:8091 tsugi.agent.v1.TsugiAgent/ListReleases
 `ListReleases`/`ListDeployments` are live; `Deploy`/`Rollback`/`Promote` return
 `Unimplemented` until P5.4.
 
+Run it as a host service (not a container — it shells `deploy.sh`) from
+[`../../deploy/tsugi.service.example`](../../deploy/tsugi.service.example): put
+`TSUGI_DATABASE_URL` in `/etc/tsugi/tsugi.env`, `make install`, enable the unit.
+The agent stays on loopback `:8091` — never add a tunnel ingress for it.
+
 ## Release CLI (Phase 6)
 
 The `tsugi` binary drives releases against the `tsugi` Postgres database. The CLI
