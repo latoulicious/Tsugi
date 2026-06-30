@@ -22,6 +22,7 @@ import (
 	"github.com/latoulicious/Tsugi/internal/cli"
 	"github.com/latoulicious/Tsugi/internal/config"
 	"github.com/latoulicious/Tsugi/internal/deploy"
+	"github.com/latoulicious/Tsugi/internal/deployflow"
 	"github.com/latoulicious/Tsugi/internal/git"
 	"github.com/latoulicious/Tsugi/internal/postgres"
 	"github.com/latoulicious/Tsugi/internal/server"
@@ -82,8 +83,16 @@ func run() error {
 
 	httpSrv := server.New(cfg, logger)
 
+	flow := &deployflow.Service{
+		Deployments: store.Deployments,
+		Tx:          store,
+		Deployer:    deploy.Script{BinDir: filepath.Join(cfg.DeployDir, "bin")},
+		Target:      cfg.Target,
+		Now:         time.Now,
+	}
+
 	grpcSrv := grpc.NewServer()
-	agentpb.RegisterTsugiAgentServer(grpcSrv, agent.New(store.Releases, store.Deployments, cfg.Target))
+	agentpb.RegisterTsugiAgentServer(grpcSrv, agent.New(store.Releases, store.Deployments, flow, cfg.Target))
 	reflection.Register(grpcSrv) // loopback only — lets grpcurl introspect the agent
 	lis, err := net.Listen("tcp", cfg.AgentAddr)
 	if err != nil {

@@ -80,3 +80,14 @@ Format per resolution:
   pass; `0.0.0.0` still rejected.
 - constraints honored: tightens a security boundary with less code; no public
   contract change; default `127.0.0.1:8091` unaffected.
+
+## R-007 Stream the deploy success line only after commit  (resolves F-014)
+- date: 2026-06-30
+- change: `ToProduction` now returns out of the `WithTx` call on error and emits
+  the "deployed … to production" line *after* the transaction commits — a rollback
+  can no longer leave a misleading success line on the gRPC/SSE stream.
+- files: internal/deployflow/deployflow.go
+- verification: `go build`/`vet`/`go test -race ./...` green (agent + cli deploy
+  tests exercise the success path); `gofmt` clean.
+- constraints honored: smallest safe change; preserves the success/failure
+  semantics, only reorders the user-visible report; no contract change.

@@ -42,6 +42,18 @@ The write-plane gRPC **agent** binds `127.0.0.1:8091` (`TSUGI_AGENT_ADDR`),
 the HTTP port the tunnel must not front it; Yagura's read plane dials it over
 localhost only (Yagura PLAN §11).
 
+## Write RPCs (P5.4)
+
+- **Single-flight.** `Promote`/`Rollback` hold a process mutex; a concurrent deploy
+  is rejected (`FailedPrecondition`), not queued — two deploys racing the same
+  checkout + compose project would corrupt each other.
+- **Detached from the caller.** A deploy runs under `context.WithoutCancel` + a 15m
+  cap, so a dropped gRPC stream (viewer navigated away) does **not** abort a deploy
+  mid-build; the deployment row's outcome still lands.
+- **Boundary validation.** The agent only acts on `service == TSUGI_TARGET`, env
+  `production`, and a commit matching `deploy.sh`'s `--ref` charset (`[0-9a-fA-F]{7,40}`).
+  `Deploy` (staging) is intentionally unimplemented.
+
 ## Routing — Cloudflare Tunnel
 
 - Two app hostnames on the shared `vps` tunnel: `lazyscan.my.id` → 8081,

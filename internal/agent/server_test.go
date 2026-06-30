@@ -29,7 +29,7 @@ func TestListReleasesDenormalizes(t *testing.T) {
 		mustDeployment(t, 10, 1, deployment.EnvProduction, deployment.StatusSucceeded, prodDeploy),
 	}
 
-	resp, err := New(rels, deps, "lazyscan").ListReleases(context.Background(), &agentpb.ListReleasesReq{})
+	resp, err := New(rels, deps, nil, "lazyscan").ListReleases(context.Background(), &agentpb.ListReleasesReq{})
 	if err != nil {
 		t.Fatalf("ListReleases: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestListDeploymentsJoinsCommit(t *testing.T) {
 		mustDeployment(t, 10, 1, deployment.EnvProduction, deployment.StatusSucceeded, time.Unix(2000, 0)),
 	}
 
-	resp, err := New(rels, deps, "lazyscan").ListDeployments(context.Background(), &agentpb.ListDeploymentsReq{})
+	resp, err := New(rels, deps, nil, "lazyscan").ListDeployments(context.Background(), &agentpb.ListDeploymentsReq{})
 	if err != nil {
 		t.Fatalf("ListDeployments: %v", err)
 	}

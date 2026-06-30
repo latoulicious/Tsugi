@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/latoulicious/Tsugi/internal/deployflow"
 	"github.com/latoulicious/Tsugi/internal/deployment"
 	"github.com/latoulicious/Tsugi/internal/release"
 )
@@ -84,7 +85,7 @@ type fakeDeployer struct {
 	runs int
 }
 
-func (d *fakeDeployer) Run(_ context.Context, _, _, ref string) error {
+func (d *fakeDeployer) Run(_ context.Context, _, _, ref string, _ deployflow.LogSink) error {
 	d.runs++
 	d.ref = ref
 	return d.err

@@ -160,3 +160,41 @@ Format per finding:
   Options: a consistent read-tx snapshot (REPEATABLE READ) vs accept + document
   for a polling read plane.
 - status: accepted (read-skew self-heals; FK prevents true orphans)
+
+## F-014 deployflow success line streamed inside the WithTx closure
+- date: 2026-06-30
+- source: coderabbit (P5.4 review)
+- severity: major
+- location: internal/deployflow/deployflow.go:71-89
+- problem: `ToProduction` emitted the "deployed … to production" line via
+  `sink.Line` *inside* the `WithTx` callback, before the transaction committed.
+  Harmless when the sink was the CLI's terminal, but P5.4 streams it to a browser:
+  a commit failure would show "deployed" and then an error line. Move the success
+  report after `WithTx` returns nil.
+- status: resolved (→ R-007)
+
+## F-015 ToProduction does not pre-validate the release transition
+- date: 2026-06-30
+- source: coderabbit (P5.4 review)
+- severity: major
+- location: internal/deployflow/deployflow.go:54-62
+- problem: suggestion to pre-check `r.TransitionTo(StatusProduction)` on a copy
+  before `Deployments.Create`/`Deployer.Run` so an invalid state fails fast.
+  Assessment: both callers already guard status before `ToProduction` — the agent
+  rejects non-`staging`/`archived` (`FailedPrecondition`), the CLI rejects in
+  `Promote`/`Rollback` — and the lifecycle map allows exactly `staging→production`
+  and `archived→production`. So `ToProduction` is only ever reached with a
+  transition-valid release; a pre-check duplicates the existing guard for no gain.
+- status: wontfix (callers already guard status; lifecycle map covers the edge)
+
+## F-016 known-constraints mixes `dev` and `development`
+- date: 2026-06-30
+- source: coderabbit (P5.4 review)
+- severity: minor
+- location: docs/wiki/known-constraints.md
+- problem: the page uses both `dev` (Single VPS section) and `development`
+  (branch-invariant section) for the staging branch. Assessment: pre-existing
+  wording predating P5.4; tidying it is unrelated cleanup outside this slice's
+  scope (working rules: no unrelated cleanup). The branch invariant section is
+  unambiguous (`staging deploys development`).
+- status: wontfix (pre-existing; unrelated-cleanup, out of slice scope)

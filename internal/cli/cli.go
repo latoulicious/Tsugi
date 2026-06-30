@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/latoulicious/Tsugi/internal/changelog"
+	"github.com/latoulicious/Tsugi/internal/deployflow"
 	"github.com/latoulicious/Tsugi/internal/deployment"
 	"github.com/latoulicious/Tsugi/internal/release"
 )
@@ -19,24 +20,14 @@ type GitReader interface {
 	Subjects(ctx context.Context, dir, prev, head string) ([]string, error)
 }
 
-// Deployer runs an actual deploy (real impl: internal/deploy shelling deploy.sh).
-type Deployer interface {
-	Run(ctx context.Context, target, env, ref string) error
-}
-
-// TxRunner advances release status and deployment outcome atomically.
-type TxRunner interface {
-	WithTx(ctx context.Context, fn func(release.Repository, deployment.Repository) error) error
-}
-
 // App is the release CLI; deps are injected so the orchestration is testable
 // without a live DB, git, or docker.
 type App struct {
 	Releases        release.Repository
 	Deployments     deployment.Repository
-	Tx              TxRunner
+	Tx              deployflow.TxRunner
 	Git             GitReader
-	Deployer        Deployer
+	Deployer        deployflow.Deployer
 	Target          string
 	StagingCheckout func() (string, error) // resolved lazily; only create reads target.env
 	Now             func() time.Time
@@ -169,64 +160,20 @@ func (a *App) Rollback(ctx context.Context, version string) error {
 	return a.deploy(ctx, r)
 }
 
-// deploy records a pending production deployment, runs the real deploy at the
-// release commit, then advances release + outcome atomically (or marks failed).
+// deploy runs the shared production-deploy use case, streaming its output to the
+// CLI's writer.
 func (a *App) deploy(ctx context.Context, r *release.Release) error {
-	dep, err := deployment.New(r.ID, deployment.EnvProduction, a.now())
-	if err != nil {
-		return err
-	}
-	if err := a.Deployments.Create(ctx, dep); err != nil {
-		return err
-	}
-	if derr := a.Deployer.Run(ctx, a.Target, "prod", r.CommitSHA); derr != nil {
-		if err := dep.MarkFailed(); err != nil {
-			return errors.Join(derr, err)
-		}
-		if err := a.Deployments.UpdateStatus(ctx, dep.ID, dep.Status); err != nil {
-			return errors.Join(derr, err)
-		}
-		return derr
-	}
-	return a.Tx.WithTx(ctx, func(rr release.Repository, dr deployment.Repository) error {
-		if err := archivePrevious(ctx, rr, r.ID); err != nil {
-			return err
-		}
-		if err := r.TransitionTo(release.StatusProduction); err != nil {
-			return err
-		}
-		if err := rr.UpdateStatus(ctx, r.ID, r.Status()); err != nil {
-			return err
-		}
-		if err := dep.MarkSucceeded(); err != nil {
-			return err
-		}
-		if err := dr.UpdateStatus(ctx, dep.ID, dep.Status); err != nil {
-			return err
-		}
-		fmt.Fprintf(a.Out, "deployed %s to production (%s)\n", r.Version, short(r.CommitSHA))
-		return nil
-	})
+	return a.flow().ToProduction(ctx, r, deployflow.WriterSink{W: a.Out})
 }
 
-// archivePrevious demotes the current production release (only one at a time).
-func archivePrevious(ctx context.Context, rr release.Repository, exceptID int64) error {
-	rels, err := rr.List(ctx)
-	if err != nil {
-		return err
+func (a *App) flow() deployflow.Service {
+	return deployflow.Service{
+		Deployments: a.Deployments,
+		Tx:          a.Tx,
+		Deployer:    a.Deployer,
+		Target:      a.Target,
+		Now:         a.Now,
 	}
-	for _, r := range rels {
-		if r.ID == exceptID || r.Status() != release.StatusProduction {
-			continue
-		}
-		if err := r.TransitionTo(release.StatusArchived); err != nil {
-			return err
-		}
-		if err := rr.UpdateStatus(ctx, r.ID, r.Status()); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (a *App) latest(ctx context.Context) (*release.Release, error) {

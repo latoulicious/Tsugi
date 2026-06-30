@@ -6,12 +6,13 @@ tsugi.agent.v1`); generated stubs in `internal/agentpb`.
 
 ## Symbols
 
-- `New(releases, deployments, service string) *Server` — builds the service over
-  two narrow read interfaces (`List(ctx)` on releases and deployments) plus the
-  target name surfaced as `service`.
+- `New(releases, deployments, flow *deployflow.Service, service string) *Server` —
+  builds the service over two narrow read interfaces (`List(ctx)` on releases and
+  deployments), the shared deploy orchestrator `flow` (write RPCs), and the target
+  name surfaced as `service`. `flow` may be nil for read-only servers.
 - `Server` — implements `agentpb.TsugiAgentServer`. Embeds
   `UnimplementedTsugiAgentServer`, so unimplemented RPCs return
-  `codes.Unimplemented`.
+  `codes.Unimplemented`. A `sync.Mutex` serializes the write RPCs (single-flight).
 
 ## RPCs
 
@@ -19,7 +20,18 @@ tsugi.agent.v1`); generated stubs in `internal/agentpb`.
 |---|---|---|
 | `ListReleases` | implemented (P5.2) | releases ⨝ latest deployment; env derived from release status, `deployed_at` from the deployment row else `created_at` |
 | `ListDeployments` | implemented (P5.2) | deployment history, `commit` joined from the release |
-| `Deploy` / `Rollback` / `Promote` | `Unimplemented` (P5.4) | server-streamed `LogLine` |
+| `Promote` | implemented (P5.4) | resolve release by commit, guard `staging`, stream `deployflow.ToProduction` |
+| `Rollback` | implemented (P5.4) | resolve release by commit, guard `archived`, stream `deployflow.ToProduction` |
+| `Deploy` | `Unimplemented` | staging deploy has no release-lifecycle hook; deferred |
+
+## Write RPCs (P5.4)
+
+`Promote`/`Rollback` validate at the boundary (service match, `production` env,
+hex commit mirroring `deploy.sh`'s `--ref` guard), take the single-flight lock,
+resolve the release by `CommitSHA`, guard its status, then stream the shared
+`internal/deployflow` orchestrator. The deploy runs under
+`context.WithoutCancel` + a 15m cap so a dropped client never aborts it mid-build;
+the deployment row's outcome lands regardless.
 
 ## Serving
 

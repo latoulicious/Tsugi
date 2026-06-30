@@ -5,10 +5,10 @@ target's compose, it does not reimplement it in Go.
 
 ## Symbols
 
-- `Run(ctx, binDir, target, env, ref)` — runs `deploy.sh --target --env
+- `Run(ctx, binDir, target, env, ref, sink)` — runs `deploy.sh --target --env
   [--ref]`; a non-empty `ref` deploys that commit (rollback), else the env
-  branch HEAD. Streams stdout/stderr.
-- `Script` (struct) — adapts `Run` to `cli.Deployer`, bound to `deploy/bin`.
+  branch HEAD. Streams stdout/stderr to `sink` (`deployflow.LogSink`) line by line.
+- `Script` (struct) — adapts `Run` to `deployflow.Deployer`, bound to `deploy/bin`.
 - `StagingCheckout(deployDir, target)` — reads `CHECKOUT_STAGING` from the
   target's `target.env` (the dev checkout the CLI reads git history from).
 

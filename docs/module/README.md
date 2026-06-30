@@ -18,6 +18,7 @@ drift.
 | postgres | `internal/postgres` | [postgres.md](postgres.md) — P5 pgx adapter + P6 tx/migrations |
 | git | `internal/git` | [git.md](git.md) — P6 git exec wrapper (changelog input) |
 | deploy | `internal/deploy` | [deploy.md](deploy.md) — P6 adapter shelling out to `deploy.sh` |
+| deployflow | `internal/deployflow` | [deployflow.md](deployflow.md) — P5.4 shared production-deploy use case (cli + agent) |
 | cli | `internal/cli` | [cli.md](cli.md) — P6 `release` CLI use-cases |
 
 ## Layering

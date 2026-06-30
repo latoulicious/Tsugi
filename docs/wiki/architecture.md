@@ -58,6 +58,7 @@ internal/deployment P5 deployment-history entity + repository port (pure domain)
 internal/postgres  P5 pgx adapter + P6 WithTx/Connect + migration runner
 internal/git       P6 git exec wrapper (HeadSHA, Subjects) — changelog input
 internal/deploy    P6 adapter shelling out to deploy/bin/deploy.sh
+internal/deployflow P5.4 shared production-deploy use case (cli + agent)
 internal/cli       P6 release CLI use-cases (create/list/show/promote/rollback)
 ```
 
